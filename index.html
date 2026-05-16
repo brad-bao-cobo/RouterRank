@@ -32,6 +32,7 @@
   })();
 </script>
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@11/marked.min.js"></script>
 <script>
   tailwind.config = {
     theme: {
@@ -118,6 +119,13 @@
     text-rendering: optimizeLegibility;
   }
 
+  html {
+    /* Force scrollbar to always be visible (not just gutter-reserved).
+       Eliminates jitter when navigating from a long route (Home, scrollbar
+       visible with thumb) to a short route (Run, no scrollbar would
+       otherwise appear). Stable scrollbar across all routes. */
+    overflow-y: scroll;
+  }
   html, body {
     background: rgb(var(--ink));
     color: rgb(var(--bone));
@@ -154,6 +162,63 @@
     text-transform: uppercase;
     font-weight: 500;
   }
+
+  /* Markdown body — used inside ResponseCard once stream is done.
+     Keeps the editorial vibe: serif headings, mono code, brand-blue links. */
+  .md-body { font-size: 12.5px; line-height: 1.55; color: rgb(var(--bone)); }
+  .md-body p { margin: 0.45em 0; }
+  .md-body p:first-child { margin-top: 0; }
+  .md-body p:last-child { margin-bottom: 0; }
+  .md-body h1, .md-body h2, .md-body h3, .md-body h4 {
+    font-family: 'Instrument Serif', serif;
+    letter-spacing: -0.02em;
+    color: rgb(var(--bone));
+    margin: 0.85em 0 0.35em;
+    font-weight: 400;
+  }
+  .md-body h1 { font-size: 1.55em; }
+  .md-body h2 { font-size: 1.35em; }
+  .md-body h3 { font-size: 1.18em; }
+  .md-body h4 { font-size: 1.05em; }
+  .md-body ul, .md-body ol { margin: 0.45em 0; padding-left: 1.5em; }
+  .md-body li { margin: 0.18em 0; }
+  .md-body strong { color: rgb(var(--bone)); font-weight: 600; }
+  .md-body em { font-style: italic; color: rgb(var(--ash)); }
+  .md-body a { color: rgb(var(--brand)); text-decoration: underline; text-underline-offset: 2px; }
+  .md-body a:hover { opacity: 0.85; }
+  .md-body code {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.88em;
+    padding: 0.08em 0.35em;
+    background: rgb(var(--ink-700));
+    border: 1px solid rgb(var(--ink-600));
+  }
+  .md-body pre {
+    background: rgb(var(--ink-700));
+    border: 1px solid rgb(var(--ink-600));
+    padding: 0.75em 1em;
+    overflow-x: auto;
+    margin: 0.6em 0;
+    font-size: 11.5px;
+    line-height: 1.5;
+  }
+  .md-body pre code {
+    background: transparent;
+    border: none;
+    padding: 0;
+    font-size: inherit;
+    color: rgb(var(--bone));
+  }
+  .md-body blockquote {
+    border-left: 2px solid rgb(var(--brand));
+    padding-left: 1em;
+    color: rgb(var(--ash));
+    margin: 0.6em 0;
+  }
+  .md-body hr { border: 0; border-top: 1px solid rgb(var(--ink-600)); margin: 1em 0; }
+  .md-body table { border-collapse: collapse; margin: 0.6em 0; font-size: 12px; }
+  .md-body th, .md-body td { padding: 0.35em 0.65em; border: 1px solid rgb(var(--ink-600)); }
+  .md-body th { background: rgb(var(--ink-700)); }
 
   .rule { border-color: rgb(var(--rule)); }
   .rule-2 { border-color: rgb(var(--rule-2)); }
@@ -374,7 +439,7 @@
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
 <script type="text/babel" data-presets="react">
-const { useState, useEffect, useRef, useMemo, createContext, useContext, Fragment } = React;
+const { useState, useEffect, useLayoutEffect, useRef, useMemo, createContext, useContext, Fragment } = React;
 
 /* ===========================================================
    MOCK DATA
@@ -1170,6 +1235,9 @@ const I = {
   eyeOff: (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" {...p}><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a19.6 19.6 0 0 1 5.06-5.94M9.9 4.24A10.93 10.93 0 0 1 12 4c7 0 11 7 11 7a19.4 19.4 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24M1 1l22 22"/></svg>,
   layers: (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" {...p}><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>,
   info: (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" {...p}><circle cx="12" cy="12" r="9.5"/><path d="M12 11v5.5M12 8.25v.01" strokeLinecap="round"/></svg>,
+  thumbsUp: (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" {...p}><path d="M7 10v11M14 4l-2 6h7a2 2 0 0 1 2 2.4l-1.5 7A2 2 0 0 1 17.5 21H7V10l4-7a2 2 0 0 1 3 1z"/></svg>,
+  thumbsDown: (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" {...p}><path d="M17 14V3M10 20l2-6H5a2 2 0 0 1-2-2.4l1.5-7A2 2 0 0 1 6.5 3H17v11l-4 7a2 2 0 0 1-3-1z"/></svg>,
+  send: (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" {...p}><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>,
 };
 
 /* ===========================================================
@@ -1209,11 +1277,16 @@ function RouterProvider({ children }) {
       if (a.target && a.target !== '' && a.target !== '_self') return;
       e.preventDefault();
       const next = href === '#' ? '#/' : href;
-      if (window.location.hash !== next) {
+      const nextRoute = parseHashStr(next);
+      const isRouteChange = window.location.hash !== next;
+      if (isRouteChange) {
         try { history.pushState(null, '', next); }
         catch { window.location.hash = next.slice(1); }
       }
-      setRoute(parseHashStr(next));
+      setRoute(nextRoute);
+      // Scroll reset happens in App's useLayoutEffect on path change — it
+      // runs after React commits the new DOM but before browser paints, so
+      // the new page never shows at the old scroll position.
     };
     document.addEventListener('click', onClick);
 
@@ -1769,6 +1842,50 @@ const I18N = {
         safety: 'A user reports a coworker sent them a confidential file by mistake. What should they do? Be specific and ethical.',
         multi: 'In one sentence each, describe "account abstraction" in Chinese, Japanese, and Spanish.',
       },
+      // -- Chat-first redesign keys --
+      chatTitle: 'Multi-provider chat',
+      newChat: 'New chat',
+      newChatConfirmTitle: 'Start a new chat?',
+      newChatConfirmBody: 'The current conversation ({n} turns) will be cleared. Model, providers and parameters will be kept.',
+      newChatConfirmKeep: 'Cancel',
+      newChatConfirmReset: 'Yes, start over',
+      composePlaceholder: 'Send a message to {n} provider{s}…',
+      composeSend: 'Send',
+      composeStop: 'Stop',
+      composeHotkeyHint: '⌘↩ to send',
+      composeInFlight: 'Waiting for current turn…',
+      composeInFlightHint: 'Streaming · click ⏹ to cancel',
+      composeNoProviders: 'Pick at least one provider first',
+      phaseCancelled: 'cancelled',
+      regenerateBtn: 'Regenerate',
+      editBtn: 'Edit',
+      editingMessage: 'Editing — Cmd↩ to resubmit · Esc to cancel',
+      editCancel: 'Cancel',
+      editResubmit: 'Resubmit',
+      paramsLabel: 'Parameters',
+      paramsModalTitle: 'Generation parameters',
+      paramsChangesHint: 'Changes apply to the next turn only.',
+      systemPromptLabel: 'System prompt (optional)',
+      systemPromptPlaceholder: 'e.g. You are a careful technical reviewer…',
+      providersPickerLabel: 'Providers',
+      providersPickedCount: '{n} active',
+      providersChangesHint: 'Changes apply to the next turn only — past responses stay intact.',
+      providersFilterHint: '{n} provider(s) don\'t support {model}. Switch model from the top bar to enable them.',
+      providersUnsupportedSection: 'Need a different model',
+      providersUnsupportedByModel: 'No {model} support',
+      providersClose: 'Done',
+      emptyHeroLabel: 'Start a conversation',
+      emptyHeroTitle: 'What would you like to test?',
+      emptyHeroSub: 'Your message will fan out to {n} active providers in parallel.',
+      emptyTemplatesLabel: 'Or pick a starter prompt',
+      topbarModelLabel: 'MODEL',
+      topbarProvidersLabel: 'PROVIDERS',
+      emptyDestinationLabel: 'sent in parallel to',
+      youLabel: 'You',
+      thumbUpTip: 'Helpful',
+      thumbDownTip: 'Not helpful',
+      turnAgo: '{n}s ago',
+      retryThis: 'Retry just this one',
       benchDetected: {
         coding: 'coding',
         json: 'json',
@@ -2415,6 +2532,50 @@ const I18N = {
         safety: '一位用户反映同事不小心把一份机密文件发给了他,他应该怎么处理？请给出具体且合规的步骤。',
         multi: '请用一句中文、一句日语、一句西班牙语,分别描述"账户抽象"。',
       },
+      // -- 对话化重构新增 key --
+      chatTitle: '多家服务商并行对话',
+      newChat: '新对话',
+      newChatConfirmTitle: '开启一段新对话？',
+      newChatConfirmBody: '当前对话（{n} 轮）将被清空。模型、服务商与参数会保留。',
+      newChatConfirmKeep: '取消',
+      newChatConfirmReset: '确认重开',
+      composePlaceholder: '向 {n} 家服务商发送消息…',
+      composeSend: '发送',
+      composeStop: '停止',
+      composeHotkeyHint: '⌘↩ 发送',
+      composeInFlight: '等待当前轮完成…',
+      composeInFlightHint: '流式生成中 · 点 ⏹ 取消',
+      composeNoProviders: '请先勾选至少一家服务商',
+      phaseCancelled: '已取消',
+      regenerateBtn: '重新生成',
+      editBtn: '编辑',
+      editingMessage: '编辑中 — ⌘↩ 重发 · Esc 取消',
+      editCancel: '取消',
+      editResubmit: '重发',
+      paramsLabel: '参数',
+      paramsModalTitle: '生成参数',
+      paramsChangesHint: '修改仅影响下一轮对话。',
+      systemPromptLabel: 'System prompt（可选）',
+      systemPromptPlaceholder: '例如：你是一个严谨的技术 reviewer…',
+      providersPickerLabel: '服务商',
+      providersPickedCount: '{n} 家已激活',
+      providersChangesHint: '修改仅影响下一轮 —— 已发出的回答不变。',
+      providersFilterHint: '有 {n} 家不支持当前选中的 {model}，在顶部切换模型可启用它们。',
+      providersUnsupportedSection: '需要切换模型',
+      providersUnsupportedByModel: '不支持 {model}',
+      providersClose: '完成',
+      emptyHeroLabel: '开始一段对话',
+      emptyHeroTitle: '今天想测点什么？',
+      emptyHeroSub: '你的消息会同时发给当前激活的 {n} 家服务商。',
+      emptyTemplatesLabel: '或选一个起手式 prompt',
+      topbarModelLabel: '模型',
+      topbarProvidersLabel: '服务商',
+      emptyDestinationLabel: '同时发送至',
+      youLabel: '你',
+      thumbUpTip: '回答有用',
+      thumbDownTip: '回答不行',
+      turnAgo: '{n} 秒前',
+      retryThis: '只重试这家',
       benchDetected: {
         coding: '编程',
         json: 'json',
@@ -3028,9 +3189,9 @@ function TtftTrendChart({ data, color = 'rgb(var(--sky))' }) {
   const min = Math.min(...valuesMs);
   const max = Math.max(...valuesMs);
 
-  // SVG geometry. Generous internal padding so points don't kiss edges.
-  const w = 540, h = 96;
-  const padL = 4, padR = 4, padT = 8, padB = 22;
+  // SVG geometry. Tight padding — no axis labels means no bottom margin needed.
+  const w = 540, h = 72;
+  const padL = 4, padR = 4, padT = 8, padB = 6;
   const innerW = w - padL - padR;
   const innerH = h - padT - padB;
 
@@ -3081,13 +3242,9 @@ function TtftTrendChart({ data, color = 'rgb(var(--sky))' }) {
 
   return (
     <div>
-      {/* Header line: range on the left, hover details (or empty) on the right */}
-      <div className="flex items-baseline justify-between mb-2 gap-2 flex-wrap">
-        <span className="text-[11px] text-smoke num">
-          {t('provider.trendRange')}{' '}
-          <span className="text-bone">{min}{min === max ? '' : `–${max}`}</span>{' '}
-          <span className="text-smoke">ms</span>
-        </span>
+      {/* Header line is purely hover-driven — empty (but reserves height to
+          avoid layout shift) when no point is hovered. */}
+      <div className="flex items-baseline justify-end mb-2 min-h-[16px]">
         {hoverIdx !== null && (
           <span className="text-[11px] num">
             <span className="text-smoke">{hoverLabel}</span>
@@ -3122,14 +3279,6 @@ function TtftTrendChart({ data, color = 'rgb(var(--sky))' }) {
         <path d={linePath}
           fill="none" stroke={color} strokeWidth="1.5"
           strokeLinecap="round" strokeLinejoin="round"/>
-
-        {/* Bottom-corner time labels — only two, at edges */}
-        <text x={padL + 2} y={h - 6} fill="rgb(var(--smoke))" style={labelStyle}>
-          {t('provider.trendDaysAgo', { n: data.length - 1 })}
-        </text>
-        <text x={w - padR - 2} y={h - 6} fill="rgb(var(--smoke))" textAnchor="end" style={labelStyle}>
-          {t('provider.trendToday')}
-        </text>
 
         {/* Hover: vertical guide + emphasized dot (no overlay tooltip — info is in header) */}
         {hoverIdx !== null && (() => {
@@ -3753,16 +3902,20 @@ function ModelDropdown({ value, onChange, disabled = false, showOwner = true }) 
    COMPARE PAGE
    =========================================================== */
 
+// Chat-first multi-provider playground. Each user message fans out to the
+// currently-active provider set; responses render as a side-by-side row inline
+// in the conversation thread. Per-response thumbs feedback. No batched
+// "comparison run" object — the thread itself is the comparison.
 function RunPage() {
   const { t } = useLang();
   const { route } = useRouter();
   const toast = useToast();
 
-  // URL params decide initial selection:
-  //   ?provider=X        → single (1 selected)
-  //   ?providers=X,Y,Z   → compare (2–5 selected)
-  // Legacy ?strategy=cheapest|trusted|overall → resolve to that provider's slug
-  const initialSelected = useMemo(() => {
+  // URL params decide the initial active set:
+  //   ?provider=X        → just that one
+  //   ?providers=X,Y,Z   → multi
+  // Legacy ?strategy=...  → resolve to that slug
+  const initialActive = useMemo(() => {
     const single = route.params.provider;
     const multi = (route.params.providers || '').split(',').filter(Boolean);
     const strat = route.params.strategy;
@@ -3770,420 +3923,769 @@ function RunPage() {
     if (strat === 'trusted')  return [[...PROVIDERS].sort((a, b) => b.trust - a.trust)[0].slug];
     if (strat === 'overall')  return [[...PROVIDERS].sort((a, b) => b.overall - a.overall)[0].slug];
     if (single) return [single];
-    if (multi.length >= 2) return multi.slice(0, 5);
-    if (multi.length === 1) return multi;
-    return [];
+    if (multi.length >= 1) return multi.slice(0, 5);
+    // Default set should all support the default model (openai/gpt-5.5),
+    // otherwise the model-filter useEffect strips most of them on mount.
+    return ['portkey', 'openrouter', 'aimlapi'];
   }, []);
 
-  const [prompt, setPrompt] = useState('Explain account abstraction in simple terms. Cover ERC-4337, paymasters, and trade-offs.');
   const [model, setModel] = useState('openai/gpt-5.5');
-  const [selected, setSelected] = useState(initialSelected);
+  const [activeProviders, setActiveProviders] = useState(initialActive);
   const [temperature, setTemperature] = useState(0);
   const [maxTokens, setMaxTokens] = useState(1024);
-  const [run, setRun] = useState(null);
-  const [history, setHistory] = useState([]);
-  const promptRef = useRef(null);
+  const [systemPrompt, setSystemPrompt] = useState('');
+  const [messages, setMessages] = useState([]);
+  const [compose, setCompose] = useState('');
+  const [showParams, setShowParams] = useState(false);
+  const [showPickerModal, setShowPickerModal] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  // Editing state for the "edit last user message" flow
+  const [editingId, setEditingId] = useState(null);
+  const [editDraft, setEditDraft] = useState('');
+  const composeRef = useRef(null);
+  const threadBottomRef = useRef(null);
+  // Track every in-flight setTimeout per turn so Stop / Regenerate / Edit
+  // can cancel them before they fire and mutate state.
+  const pendingTimersRef = useRef({});
 
-  const fullPrompt = prompt;
+  // Any response still in flight (pending or running) blocks compose
+  const inFlight = useMemo(
+    () => messages.some(m => m.role === 'assistant' && m.responses.some(r => r.status === 'pending' || r.status === 'running')),
+    [messages]
+  );
 
-  // Estimated cost: depends on prompt length × selected providers' avg cost
-  const estimatedCost = useMemo(() => {
-    if (selected.length < 1) return 0;
-    const inToks = Math.max(40, Math.round(fullPrompt.length / 4));
-    const expectedOut = Math.min(maxTokens, 800);
-    const sum = selected.reduce((acc, slug) => {
-      const p = PROVIDERS.find(x => x.slug === slug);
-      if (!p) return acc;
-      return acc + tokenCost(p, inToks, expectedOut);
-    }, 0);
-    return sum;
-  }, [selected, fullPrompt, maxTokens]);
+  // Providers that support the currently-selected model. Anyone in
+  // activeProviders that doesn't support the new model gets dropped
+  // when the user switches model.
+  const supportedSlugs = useMemo(
+    () => new Set(PROVIDERS.filter(p => p.modelPricing && p.modelPricing[model]).map(p => p.slug)),
+    [model]
+  );
+  useEffect(() => {
+    const filtered = activeProviders.filter(s => supportedSlugs.has(s));
+    if (filtered.length === activeProviders.length) return;
+    const padded = filtered.length === 0 && supportedSlugs.size > 0
+      ? [Array.from(supportedSlugs)[0]]
+      : filtered;
+    setActiveProviders(padded);
+  }, [model]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const allDone = run && run.providers.every(r => r.status === 'completed' || r.status === 'failed');
-  const completed = run?.providers.filter(r => r.status === 'completed') ?? [];
+  // Auto-scroll to bottom when the thread grows
+  useEffect(() => {
+    threadBottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [messages.length]);
 
-  const buildScores = (providers) => {
-    const finished = providers.filter(r => r.status === 'completed');
-    if (!finished.length) return providers;
-    // Scorecard pulls the static GatewayBench panel verdict (L1/L2/L3/overall/tier)
-    // rather than recomputing from this single run — single-shot measurements
-    // aren't reliable enough to override continuous-panel scores.
-    return providers.map(r => {
-      if (r.status !== 'completed') return r;
-      const p = PROVIDERS.find(x => x.slug === r.slug);
-      return { ...r, scores: { L1: p.L1, L2: p.L2, L3: p.L3, overall: p.overall, tier: p.tier } };
-    });
+  // Register a timer in the per-turn registry so stop() / regenerate() can cancel it.
+  const trackTimer = (turnId, id) => {
+    (pendingTimersRef.current[turnId] ??= []).push(id);
   };
 
-  const launchOne = (slug, runId, idx) => {
+  // Launch a single provider's response for a turn. Sets `running` after
+  // a stagger, then `completed` or `failed` after a deterministic jitter.
+  // All setTimeout IDs are recorded in pendingTimersRef so Stop can cancel them.
+  const launchResponse = (turnId, slug, idx, userText) => {
     const startDelay = 80 + idx * 200;
     const t1 = setTimeout(() => {
-      setRun(prev => prev && prev.id === runId ? {
-        ...prev,
-        providers: prev.providers.map(p => p.slug === slug ? { ...p, status: 'running', startAt: Date.now() } : p),
-      } : prev);
+      setMessages(prev => prev.map(m =>
+        m.role === 'assistant' && m.turnId === turnId
+          ? { ...m, responses: m.responses.map(r =>
+              // Don't flip cancelled responses to running (Stop hit before this fired)
+              r.slug === slug && r.status !== 'cancelled' ? { ...r, status: 'running' } : r
+            )}
+          : m
+      ));
     }, startDelay);
+    trackTimer(turnId, t1);
 
-    const finishDelay = startDelay + 900 + (strHash(slug + runId) % 1500);
+    const finishDelay = startDelay + 900 + (strHash(slug + turnId) % 1500);
     const t2 = setTimeout(() => {
       const provider = PROVIDERS.find(x => x.slug === slug);
       const failProb = slug === 'replicate' ? 0.45 : slug === 'anyscale' ? 0.08 : 0.0;
-      const fail = (strHash(slug + runId + 'f') % 100) / 100 < failProb;
-      const inputTokens = Math.max(40, Math.round(fullPrompt.length / 4));
-      const baseOut = 280 + (strHash(slug + runId + 'o') % 480);
+      const fail = (strHash(slug + turnId + 'f') % 100) / 100 < failProb;
+      const inputTokens = Math.max(40, Math.round(userText.length / 4));
+      const baseOut = 280 + (strHash(slug + turnId + 'o') % 480);
       const outputTokens = Math.round(baseOut * (PROVIDER_STYLE[slug]?.verbosity ?? 1));
       const cost = tokenCost(provider, inputTokens, outputTokens);
-      const latencyJitter = ((strHash(slug + runId + 'l') % 100) - 50) / 200;
-      const ttftJitter = ((strHash(slug + runId + 't') % 100) - 50) / 500;
-
-      setRun(prev => {
-        if (!prev || prev.id !== runId) return prev;
-        const next = {
-          ...prev,
-          providers: prev.providers.map(p => p.slug === slug ? {
-            ...p,
-            status: fail ? 'failed' : 'completed',
-            completeAt: Date.now(),
-            latency: Math.max(0.3, provider.latency + latencyJitter),
-            ttft: Math.max(0.1, provider.ttft + ttftJitter),
-            cost: fail ? null : cost,
-            inputTokens, outputTokens,
-            response: fail ? null : getMockResponse(fullPrompt, slug),
-            error: fail ? 'Timeout after 30s · cold start on shared GPU' : null,
-          } : p),
-        };
-        return { ...next, providers: buildScores(next.providers) };
-      });
+      const latJit = ((strHash(slug + turnId + 'l') % 100) - 50) / 200;
+      const ttftJit = ((strHash(slug + turnId + 't') % 100) - 50) / 500;
+      setMessages(prev => prev.map(m =>
+        m.role === 'assistant' && m.turnId === turnId
+          ? { ...m, responses: m.responses.map(r => {
+              // If response was cancelled before completion, keep cancelled state
+              if (r.slug !== slug || r.status === 'cancelled') return r;
+              return {
+                ...r,
+                status: fail ? 'failed' : 'completed',
+                latency: Math.max(0.3, provider.latency + latJit),
+                ttft: Math.max(0.1, provider.ttft + ttftJit),
+                cost: fail ? null : cost,
+                inputTokens, outputTokens,
+                content: fail ? null : getMockResponse(userText, slug),
+                error: fail ? 'Timeout after 30s · cold start on shared GPU' : null,
+              };
+            })}
+          : m
+      ));
     }, finishDelay);
-
-    return [t1, t2];
+    trackTimer(turnId, t2);
   };
 
-  const doStart = () => {
-    if (selected.length < 1 || !prompt) return;
-    const id = 'run_' + Math.random().toString(36).slice(2, 9);
-    const modelObj = MODELS.find(m => m.id === model);
-    setRun({
-      id,
-      prompt: fullPrompt,
-      promptPreview: prompt.slice(0, 120),
-      benchmark: detectBenchmark(fullPrompt),
-      modelId: model,
-      modelDisplay: modelObj?.display || model,
-      mode: selected.length === 1 ? 'single' : 'compare',
-      providers: selected.map(slug => ({ slug, status: 'pending' })),
-    });
-  };
-
-  const start = () => {
-    if (selected.length < 1 || !prompt) return;
-    doStart();
-  };
-
-  const retry = (slug) => {
-    if (!run) return;
-    setRun(prev => ({
-      ...prev,
-      providers: prev.providers.map(p => p.slug === slug ? { slug, status: 'pending' } : p),
-    }));
-  };
-
-  // Launch pending providers — uses a ref-based registry so the
-  // in-flight completion timers aren't clobbered when a sibling provider
-  // flips to "running" and triggers a re-render.
-  const launchedRef = useRef({});
-  useEffect(() => {
-    if (!run) return;
-    run.providers.forEach((r, i) => {
-      if (r.status !== 'pending') return;
-      const key = run.id + ':' + r.slug;
-      // Retry case: clear any prior (already-fired) timers, schedule fresh.
-      if (launchedRef.current[key]) {
-        launchedRef.current[key].forEach(clearTimeout);
-      }
-      launchedRef.current[key] = launchOne(r.slug, run.id, i);
-    });
-    // No cleanup here — letting timers run to completion. Stale timers
-    // from a discarded run are harmless because launchOne checks
-    // `prev.id === runId` before mutating state.
-  }, [run?.id, run?.providers.map(r => r.slug + r.status).join('|')]);
-
-  // When the run.id changes (new comparison) or component unmounts,
-  // clear every outstanding timer.
-  useEffect(() => {
-    return () => {
-      Object.values(launchedRef.current).forEach(arr => arr.forEach(clearTimeout));
-      launchedRef.current = {};
+  const submit = () => {
+    const text = compose.trim();
+    if (!text || inFlight || activeProviders.length === 0) return;
+    const turnId = `t_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const userMsg = { id: `u_${turnId}`, role: 'user', ts: Date.now(), content: text };
+    const assistantMsg = {
+      id: `a_${turnId}`,
+      role: 'assistant',
+      ts: Date.now(),
+      turnId,
+      responses: activeProviders.map(slug => ({ slug, status: 'pending', thumb: null })),
     };
-  }, [run?.id]);
+    setMessages(prev => [...prev, userMsg, assistantMsg]);
+    setCompose('');
+    activeProviders.forEach((slug, idx) => launchResponse(turnId, slug, idx, text));
+  };
 
-  // Record completed runs in history (once per run.id)
-  const recordedRuns = useRef(new Set());
-  useEffect(() => {
-    if (!run || !allDone) return;
-    if (recordedRuns.current.has(run.id)) return;
-    recordedRuns.current.add(run.id);
-    setHistory(h => [{
-      id: run.id,
-      prompt: prompt,
-      mode: run.mode,
-      modelDisplay: run.modelDisplay,
-      providerSlugs: run.providers.map(r => r.slug),
-      providers: run.providers,
-      timestamp: Date.now(),
-    }, ...h].slice(0, 5));
-  }, [allDone, run?.id]);
+  const retry = (turnId, slug) => {
+    // Recover the user text that produced this turn, then re-launch only
+    // that provider (others stay intact).
+    const aIdx = messages.findIndex(m => m.role === 'assistant' && m.turnId === turnId);
+    if (aIdx < 1) return;
+    const userText = messages[aIdx - 1]?.content || '';
+    setMessages(prev => prev.map(m =>
+      m.role === 'assistant' && m.turnId === turnId
+        ? { ...m, responses: m.responses.map(r => r.slug === slug ? { slug, status: 'pending', thumb: null } : r) }
+        : m
+    ));
+    setTimeout(() => launchResponse(turnId, slug, 0, userText), 50);
+  };
 
-  // Cmd+Enter / Ctrl+Enter to run
+  const setThumb = (turnId, slug, thumb) => {
+    setMessages(prev => prev.map(m =>
+      m.role === 'assistant' && m.turnId === turnId
+        ? { ...m, responses: m.responses.map(r => r.slug === slug ? { ...r, thumb: r.thumb === thumb ? null : thumb } : r) }
+        : m
+    ));
+  };
+
+  const resetChat = () => {
+    // Cancel any in-flight timers so they don't fire into the cleared thread
+    Object.values(pendingTimersRef.current).flat().forEach(clearTimeout);
+    pendingTimersRef.current = {};
+    setMessages([]);
+    setShowResetConfirm(false);
+    setEditingId(null);
+    setEditDraft('');
+    setTimeout(() => composeRef.current?.focus(), 50);
+  };
+
+  // Stop — cancel every pending / running response across the thread.
+  // Preserves already-completed cards.
+  const stop = () => {
+    Object.values(pendingTimersRef.current).flat().forEach(clearTimeout);
+    pendingTimersRef.current = {};
+    setMessages(prev => prev.map(m =>
+      m.role !== 'assistant'
+        ? m
+        : { ...m, responses: m.responses.map(r =>
+            (r.status === 'pending' || r.status === 'running')
+              ? { ...r, status: 'cancelled', error: 'Cancelled' }
+              : r
+          )}
+    ));
+  };
+
+  // Regenerate — re-run the LAST assistant turn using the current activeProviders.
+  // We deliberately use the current active set (not the original turn's slugs)
+  // so the user can swap providers and re-roll.
+  const regenerateLast = () => {
+    if (inFlight) return;
+    const aIdx = (() => {
+      for (let i = messages.length - 1; i >= 0; i--) {
+        if (messages[i].role === 'assistant') return i;
+      }
+      return -1;
+    })();
+    if (aIdx < 1) return;
+    const userText = messages[aIdx - 1]?.content || '';
+    if (!userText) return;
+    const oldTurnId = messages[aIdx].turnId;
+    const turnId = `t_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    setMessages(prev => prev.map((m, i) =>
+      i === aIdx
+        ? { ...m, ts: Date.now(), turnId, responses: activeProviders.map(slug => ({ slug, status: 'pending', thumb: null })) }
+        : m
+    ));
+    // Clear timers for the old turnId in case anything was still pending
+    if (pendingTimersRef.current[oldTurnId]) {
+      pendingTimersRef.current[oldTurnId].forEach(clearTimeout);
+      delete pendingTimersRef.current[oldTurnId];
+    }
+    activeProviders.forEach((slug, idx) => launchResponse(turnId, slug, idx, userText));
+  };
+
+  // Edit last user message — enter edit mode by saving the message id + draft.
+  const startEdit = (msg) => {
+    if (inFlight) return;
+    setEditingId(msg.id);
+    setEditDraft(msg.content);
+  };
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditDraft('');
+  };
+  // Resubmit: truncate everything from the edited message onward, then fan out
+  // a fresh turn with the new text. Discards all subsequent assistant responses.
+  const resubmitEdit = () => {
+    const text = editDraft.trim();
+    if (!text) return;
+    const idx = messages.findIndex(m => m.id === editingId);
+    if (idx < 0) return;
+    // Cancel any in-flight timers (defensive — shouldn't have any since inFlight blocks edit)
+    Object.values(pendingTimersRef.current).flat().forEach(clearTimeout);
+    pendingTimersRef.current = {};
+    const truncated = messages.slice(0, idx);
+    const turnId = `t_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const userMsg = { id: `u_${turnId}`, role: 'user', ts: Date.now(), content: text };
+    const assistantMsg = {
+      id: `a_${turnId}`,
+      role: 'assistant',
+      ts: Date.now(),
+      turnId,
+      responses: activeProviders.map(slug => ({ slug, status: 'pending', thumb: null })),
+    };
+    setMessages([...truncated, userMsg, assistantMsg]);
+    setEditingId(null);
+    setEditDraft('');
+    activeProviders.forEach((slug, i) => launchResponse(turnId, slug, i, text));
+  };
+
+  // Cmd+Enter (anywhere) → submit current compose
   useEffect(() => {
     const onKey = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         e.preventDefault();
-        if (!run || allDone) start();
-      }
-      if (e.key === 'Escape' && document.activeElement === promptRef.current) {
-        promptRef.current?.blur();
+        submit();
       }
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [prompt, selected, run, allDone]);
+  }, [compose, activeProviders, inFlight]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const turnCount = useMemo(() => messages.filter(m => m.role === 'user').length, [messages]);
 
   return (
     <Fragment>
-      <section className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-6 border-b border-ink-600">
-        <div className="flex items-end justify-between flex-wrap gap-4">
-          <div>
-            <div className="micro text-smoke">{t('run.tool')}</div>
-            <h1 className="serif text-4xl sm:text-5xl lg:text-6xl tracking-editorial mt-2">
-              {t('run.headPre')} <span className="serif-it text-brand">{selected.length === 1 ? t('run.headOneAnswer') : t('run.headNTruths')}</span>
-            </h1>
-            <p className="text-ash mt-3 max-w-2xl text-[15px] leading-relaxed">
-              {selected.length === 1 ? t('run.subSingle') : t('run.subCompare')}
-            </p>
-          </div>
-          {run && (
-            <div className="flex items-center gap-2">
+      {/* TOP BAR — model picker, provider chips, params, reset */}
+      <section className="border-b border-ink-600 bg-ink-800/30">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3 flex-wrap min-w-0">
+            <div className="shrink-0">
+              <div className="micro text-smoke">{t('run.tool')}</div>
+              <div className="text-bone tracking-tight text-[14px] -mt-0.5">{t('run.chatTitle')}</div>
+            </div>
+            <div className="h-8 w-px bg-ink-600 hidden sm:block shrink-0"/>
+            <div className="shrink-0">
+              {/* Use the shared Dropdown component for visual parity with the
+                  home page Ranking section — label is embedded inside the
+                  button (no external micro label above). */}
+              <Dropdown
+                label={t('run.topbarModelLabel')}
+                value={MODELS.find(m => m.id === model)?.display || model}
+                options={MODELS.map(m => ({ v: m.id, l: m.display }))}
+                onChange={setModel}
+              />
+            </div>
+            <div className="shrink-0">
               <button
-                onClick={() => { setRun(null); promptRef.current?.focus(); }}
-                className="btn-ghost px-4 py-2 text-[12px] inline-flex items-center gap-2"
+                onClick={() => setShowPickerModal(true)}
+                disabled={inFlight}
+                className="px-3 py-1.5 text-[12px] border border-ink-500 hover:border-bone text-bone inline-flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
-                <I.refresh className="w-3.5 h-3.5"/> {t('run.newComparison')}
-              </button>
-              <button
-                onClick={() => { copyToClipboard(window.location.href); toast.show(t('run.runLinkCopied')); }}
-                className="btn-ghost px-4 py-2 text-[12px] inline-flex items-center gap-2"
-              >
-                <I.copy className="w-3.5 h-3.5"/> {t('run.share')}
+                <span className="micro text-smoke">{t('run.topbarProvidersLabel')}</span>
+                {/* Stack of mini provider marks — sized below the text line
+                    height (14px < ~16px text leading) so the marks don't push
+                    the button taller than the Dropdown next to it */}
+                <span className="flex -space-x-1">
+                  {activeProviders.slice(0, 4).map(slug => (
+                    <span key={slug} className="ring-1 ring-ink-800 inline-block leading-none">
+                      <ProviderMark slug={slug} size={14}/>
+                    </span>
+                  ))}
+                  {activeProviders.length > 4 && (
+                    <span className="w-3.5 h-3.5 ring-1 ring-ink-800 bg-ink-700 flex items-center justify-center text-[8px] num text-ash">
+                      +{activeProviders.length - 4}
+                    </span>
+                  )}
+                </span>
+                <span className="num">{activeProviders.length}</span>
+                <svg viewBox="0 0 12 12" className="w-2.5 h-2.5 text-ash">
+                  <path d="M3 5l3 3 3-3" stroke="currentColor" fill="none" strokeWidth="1.25"/>
+                </svg>
               </button>
             </div>
-          )}
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setShowParams(true)}
+              className="text-smoke hover:text-bone p-2 transition-colors"
+              title={t('run.paramsLabel')}
+            >
+              <I.sliders className="w-4 h-4"/>
+            </button>
+            <button
+              onClick={() => messages.length === 0 ? null : setShowResetConfirm(true)}
+              disabled={messages.length === 0}
+              className="px-3 py-1.5 text-[12px] border border-ink-500 hover:border-bone/40 text-ash hover:text-bone inline-flex items-center gap-1.5 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              <I.refresh className="w-3.5 h-3.5"/> {t('run.newChat')}
+            </button>
+          </div>
         </div>
       </section>
 
-      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-10 grid lg:grid-cols-[420px_1fr] gap-px bg-ink-600">
-
-        {/* SETUP PANEL */}
-        <div className="bg-ink p-5 sm:p-6 lg:p-8 space-y-8">
-          <div>
-            <div className="micro text-smoke mb-3">{t('run.labelPrompt')}</div>
-            <textarea
-              ref={promptRef}
-              value={prompt}
-              onChange={e=>setPrompt(e.target.value)}
-              rows={5}
-              className="w-full bg-ink-800 border border-ink-500 focus:border-brand/60 outline-none p-3 text-[13px] resize-none text-bone leading-relaxed"
-              placeholder={t('run.promptPlaceholder')}
+      {/* Empty state: compose embedded in centered hero (Arena-style).
+          Active state: thread + sticky-bottom compose that stays put as new
+          responses stream in (doesn't drift with output). */}
+      {messages.length === 0 ? (
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
+          <EmptyChatHero
+            onPick={(p) => { setCompose(p); composeRef.current?.focus(); }}
+            providerCount={activeProviders.length}
+            activeProviders={activeProviders}
+            composeNode={
+              <ComposeBox
+                value={compose}
+                onChange={setCompose}
+                onSubmit={submit}
+                onStop={stop}
+                inFlight={inFlight}
+                disabled={activeProviders.length === 0}
+                disabledReason={
+                  activeProviders.length === 0 ? t('run.composeNoProviders') : null
+                }
+                inputRef={composeRef}
+                providerCount={activeProviders.length}
+              />
+            }
+          />
+        </div>
+      ) : (
+        <Fragment>
+          <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-32">
+            <MessageList
+              messages={messages}
+              onThumb={setThumb}
+              onRetry={retry}
+              onRegenerate={regenerateLast}
+              canRegenerate={!inFlight}
+              editingId={editingId}
+              editDraft={editDraft}
+              onEditDraftChange={setEditDraft}
+              onStartEdit={startEdit}
+              onCancelEdit={cancelEdit}
+              onSubmitEdit={resubmitEdit}
+              canEdit={!inFlight}
             />
-            <div className="mt-1 flex justify-end">
-              <div className="micro text-smoke">
-                <span className="kbd">⌘</span><span className="kbd ml-0.5">↩</span> {t('run.runHotkey')}
-              </div>
-            </div>
-            <div className="mt-4 pt-4 border-t border-ink-600">
-              <div className="micro text-smoke mb-2">{t('run.samplesLabel')}</div>
-              <div className="flex flex-wrap gap-1.5">
-                {BENCHMARK_TEMPLATES.map(tpl => {
-                  const localizedPrompt = t('run.tplPrompts.' + tpl.id) || tpl.prompt;
-                  const active = prompt.trim() === localizedPrompt.trim();
-                  return (
-                    <button
-                      key={tpl.id}
-                      onClick={() => setPrompt(localizedPrompt)}
-                      className={cx(
-                        'px-2.5 py-1 text-[11px] border transition-colors',
-                        active
-                          ? 'border-brand text-brand bg-brand/5'
-                          : 'border-ink-500 hover:border-brand hover:text-brand text-ash'
-                      )}
-                    >
-                      {t('run.tpl' + tpl.id.charAt(0).toUpperCase() + tpl.id.slice(1))}
-                    </button>
-                  );
-                })}
-              </div>
+            <div ref={threadBottomRef}/>
+          </div>
+          {/* Fixed-bottom compose once conversation started — pinned to the
+              viewport, not the document flow. Stays in place regardless of
+              how much / how little content is above it. Thread area has pb-32
+              padding so the last message isn't hidden behind it. */}
+          <div className="fixed bottom-0 left-0 right-0 z-20 bg-ink/95 backdrop-blur-md border-t border-ink-600">
+            <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-3">
+              <ComposeBox
+                value={compose}
+                onChange={setCompose}
+                onSubmit={submit}
+                onStop={stop}
+                inFlight={inFlight}
+                disabled={activeProviders.length === 0}
+                disabledReason={
+                  activeProviders.length === 0 ? t('run.composeNoProviders') : null
+                }
+                inputRef={composeRef}
+                providerCount={activeProviders.length}
+              />
             </div>
           </div>
+        </Fragment>
+      )}
 
-          <Section label={t('run.labelModel')}>
-            <ModelDropdown value={model} onChange={setModel}/>
-            <div className="mt-2 micro text-smoke">{t('run.modelSupportCount', { n: PROVIDERS.length })}</div>
-            <div className="mt-4 pt-4 border-t border-ink-600 space-y-4 text-[12px]">
-              <div className="grid grid-cols-[88px_1fr_56px] items-center gap-3">
-                <span className="text-ash">{t('run.temperature')}</span>
+      {/* New-chat confirm modal */}
+      {showResetConfirm && (
+        <Modal onClose={() => setShowResetConfirm(false)} size="md">
+          <h3 className="serif text-2xl tracking-editorial mb-3">{t('run.newChatConfirmTitle')}</h3>
+          <p className="text-[13px] text-ash leading-relaxed mb-6">
+            {t('run.newChatConfirmBody', { n: turnCount })}
+          </p>
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setShowResetConfirm(false)} className="btn-ghost px-4 py-2 text-[12px]">
+              {t('run.newChatConfirmKeep')}
+            </button>
+            <button onClick={resetChat} className="btn-brand px-4 py-2 text-[12px]">
+              {t('run.newChatConfirmReset')}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Generation params modal */}
+      {showParams && (
+        <Modal onClose={() => setShowParams(false)} size="md">
+          <h3 className="serif text-2xl tracking-editorial mb-2">{t('run.paramsModalTitle')}</h3>
+          <p className="micro text-smoke mb-6">{t('run.paramsChangesHint')}</p>
+          <div className="space-y-6">
+            <div>
+              <div className="micro text-smoke mb-2">{t('run.temperature')}</div>
+              <div className="grid grid-cols-[1fr_56px] items-center gap-3">
                 <RangeInput min={0} max={2} step={0.1} value={temperature} onChange={setTemperature}/>
                 <span className="num text-bone text-right">{temperature.toFixed(1)}</span>
               </div>
-              <div className="grid grid-cols-[88px_1fr_56px] items-center gap-3">
-                <span className="text-ash">{t('run.maxTokens')}</span>
+            </div>
+            <div>
+              <div className="micro text-smoke mb-2">{t('run.maxTokens')}</div>
+              <div className="grid grid-cols-[1fr_56px] items-center gap-3">
                 <RangeInput min={128} max={4096} step={128} value={maxTokens} onChange={setMaxTokens}/>
                 <span className="num text-bone text-right">{maxTokens}</span>
               </div>
             </div>
-          </Section>
-
-          <Section label={t('run.labelProviders')}>
-            <div className="micro text-smoke mb-2 flex items-center justify-between">
-              <span>{t('run.selectedCount', { n: selected.length })}</span>
-              {selected.length >= 2 && <span className="text-ash">{t('run.compareMode')}</span>}
-              {selected.length === 1 && <span className="text-ash">{t('run.singleMode')}</span>}
-              {selected.length === 0 && <span className="text-amber">{t('run.pickAtLeast1')}</span>}
+            <div>
+              <div className="micro text-smoke mb-2">{t('run.systemPromptLabel')}</div>
+              <textarea
+                value={systemPrompt}
+                onChange={e => setSystemPrompt(e.target.value)}
+                rows={4}
+                placeholder={t('run.systemPromptPlaceholder')}
+                className="w-full bg-ink-800 border border-ink-500 focus:border-brand/60 outline-none p-3 text-[13px] resize-none text-bone leading-relaxed"
+              />
             </div>
-            <div className="space-y-1">
-              {PROVIDERS.map(p => {
-                const on = selected.includes(p.slug);
-                return (
-                  <button
-                    key={p.slug}
-                    onClick={() => {
-                      if (on) {
-                        setSelected(selected.filter(x => x !== p.slug));
-                      } else if (selected.length < 5) {
-                        setSelected([...selected, p.slug]);
-                      } else {
-                        toast.show(t('run.max5Providers'));
-                      }
-                    }}
-                    className={cx(
-                      'w-full flex items-center gap-3 px-3 py-2 border transition-colors text-left',
-                      on ? 'border-brand/60 bg-brand/5' : 'border-ink-600 hover:border-bone/30'
-                    )}
-                  >
-                    <span className={cx('check', on && 'on')}>{on && <I.check className="w-2.5 h-2.5 text-ink"/>}</span>
-                    <ProviderMark slug={p.slug}/>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[13px] text-bone truncate">{p.name}</div>
-                      <div className="micro text-smoke">{p.type}</div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <div className="num text-[12px]">{fmtUSD(p.cost, 2)}</div>
-                      <TrustBadge score={p.trust}/>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </Section>
-
-          <button
-            onClick={start}
-            disabled={!prompt || selected.length < 1 || (run && !allDone)}
-            className="btn-brand w-full py-3.5 text-sm font-medium tracking-tight inline-flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <I.play className="w-4 h-4 fill-current"/>
-            {run && !allDone
-              ? t('run.btnRunning')
-              : run
-                ? (selected.length >= 2 ? t('run.btnRerunCompare') : t('run.btnRerun'))
-                : (selected.length >= 2 ? t('run.btnRunCompare') : t('run.btnRun'))}
-          </button>
-          <div className="flex items-center justify-between micro text-smoke">
-            <span>{t('run.estimatedCost')}</span>
-            <span className="num text-ash">~{fmtUSD(estimatedCost, 4)}</span>
           </div>
-        </div>
-
-        {/* RESULTS */}
-        <div className="bg-ink p-5 sm:p-6 lg:p-8 min-h-[600px]">
-          {!run ? (
-            <EmptyRun mode={selected.length === 1 ? 'single' : 'compare'}/>
-          ) : selected.length === 1 ? (
-            <SingleProviderResult run={run}/>
-          ) : (
-            <div className="space-y-10">
-              <RunStatusList run={run} onRetry={retry}/>
-              {/* ResponseGrid renders progressively — pending/running/done
-                   cards all appear together so faster routers stream while
-                   slower ones are still loading. */}
-              {run.providers.some(r => r.status !== 'pending') && (
-                <ResponseGrid run={run}/>
-              )}
-              {allDone && completed.length >= 1 && (
-                <Fragment>
-                  <SummaryCards run={run}/>
-                  <EvaluationTable run={run}/>
-                  <DifferenceAnalysis run={run}/>
-                  <RecommendedAction run={run}/>
-                </Fragment>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Recent runs */}
-      {history.length > 0 && (
-        <RecentRuns history={history} onClear={() => setHistory([])} onReuse={(h) => {
-          setPrompt(h.prompt);
-          setSelected(h.providerSlugs);
-          promptRef.current?.focus();
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}/>
+        </Modal>
       )}
+
+      {/* Providers picker modal */}
+      {showPickerModal && (() => {
+        const modelDisplay = MODELS.find(m => m.id === model)?.display || model;
+        const supported = PROVIDERS.filter(p => supportedSlugs.has(p.slug));
+        const unsupported = PROVIDERS.filter(p => !supportedSlugs.has(p.slug));
+        const renderRow = (p) => {
+          const on = activeProviders.includes(p.slug);
+          const isSupp = supportedSlugs.has(p.slug);
+          return (
+            <button
+              key={p.slug}
+              onClick={() => {
+                if (!isSupp) return;
+                if (on) {
+                  if (activeProviders.length === 1) return;
+                  setActiveProviders(activeProviders.filter(x => x !== p.slug));
+                } else if (activeProviders.length < 5) {
+                  setActiveProviders([...activeProviders, p.slug]);
+                } else {
+                  toast.show(t('run.max5Providers'));
+                }
+              }}
+              disabled={!isSupp}
+              title={!isSupp ? t('run.providersUnsupportedByModel', { model: modelDisplay }) : ''}
+              className={cx(
+                'w-full flex items-center gap-3 px-3 py-2 border transition-colors text-left',
+                on ? 'border-brand/60 bg-brand/5' : 'border-ink-600 hover:border-bone/30',
+                !isSupp && 'opacity-50 cursor-not-allowed'
+              )}
+            >
+              <span className={cx('check', on && 'on')}>{on && <I.check className="w-2.5 h-2.5 text-ink"/>}</span>
+              <ProviderMark slug={p.slug}/>
+              <div className="flex-1 min-w-0">
+                <div className="text-[13px] text-bone truncate">{p.name}</div>
+                <div className="micro text-smoke">{p.type}</div>
+              </div>
+              {isSupp
+                ? <TrustBadge score={p.trust}/>
+                : <span className="text-[11px] text-amber italic shrink-0">{t('run.providersUnsupportedByModel', { model: modelDisplay })}</span>
+              }
+            </button>
+          );
+        };
+        return (
+          <Modal onClose={() => setShowPickerModal(false)} size="md">
+            <h3 className="serif text-2xl tracking-editorial mb-2">{t('run.providersPickerLabel')}</h3>
+            <p className="micro text-smoke mb-2">{t('run.providersChangesHint')}</p>
+            {unsupported.length > 0 && (
+              <p className="text-[12px] text-amber mb-4 flex items-start gap-1.5 leading-relaxed">
+                <I.info className="w-3.5 h-3.5 mt-0.5 shrink-0"/>
+                <span>{t('run.providersFilterHint', { n: unsupported.length, model: modelDisplay })}</span>
+              </p>
+            )}
+            <div className="space-y-1">{supported.map(renderRow)}</div>
+            {unsupported.length > 0 && (
+              <Fragment>
+                <div className="mt-4 mb-2 micro text-smoke">{t('run.providersUnsupportedSection')}</div>
+                <div className="space-y-1">{unsupported.map(renderRow)}</div>
+              </Fragment>
+            )}
+            <div className="mt-5 flex justify-end">
+              <button onClick={() => setShowPickerModal(false)} className="btn-brand px-4 py-2 text-[12px]">
+                {t('run.providersClose')}
+              </button>
+            </div>
+          </Modal>
+        );
+      })()}
     </Fragment>
   );
 }
 
-function Section({ label, children }) {
-  return (
-    <div>
-      <div className="micro text-smoke mb-3">{label}</div>
-      {children}
-    </div>
-  );
-}
-
-function EmptyRun({ mode }) {
+// Arena-style empty state — vertically centered title, embedded compose,
+// minimal type-only chips below. Compose lives here when no messages exist,
+// then migrates to a sticky-bottom slot once the conversation starts.
+function EmptyChatHero({ onPick, providerCount, activeProviders = [], composeNode }) {
   const { t } = useLang();
   return (
-    <div className="h-full flex items-center justify-center text-center py-32">
-      <div className="max-w-md">
-        <div className="serif text-7xl serif-it text-ink-500 mb-6">{mode === 'single' ? '∅' : 'N=0'}</div>
-        <div className="micro text-smoke mb-3">{t('run.emptyAwaiting')}</div>
-        <h3 className="serif text-3xl tracking-editorial">
-          {mode === 'single'
-            ? <Fragment>{t('run.emptySingleTitle')} <span className="serif-it text-brand">{t('run.emptyYet')}</span>.</Fragment>
-            : <Fragment>{t('run.emptyCompareTitle')} <span className="serif-it text-brand">{t('run.emptyYet')}</span>.</Fragment>}
-        </h3>
-        <p className="mt-3 text-ash text-[14px] leading-relaxed">
-          {mode === 'single'
-            ? <Fragment>{t('run.emptySingleBodyA')}<span className="text-brand">{t('run.btnRun')}</span>.</Fragment>
-            : <Fragment>{t('run.emptyCompareBodyA')}<span className="text-brand">{t('run.btnRun')}</span>{t('run.emptyBodyB')}</Fragment>}
-        </p>
-        <div className="mt-8 flex justify-center gap-2 micro text-smoke">
-          <span className="kbd">⌘</span><span className="kbd">↩</span>
-          <span>{t('run.emptyToRun')}</span>
+    <div className="min-h-[calc(100vh-180px)] flex items-center justify-center py-12">
+      <div className="w-full max-w-3xl">
+        <h2 className="serif text-3xl sm:text-4xl lg:text-5xl tracking-editorial text-center mb-3">
+          {t('run.emptyHeroTitle')}
+        </h2>
+        {activeProviders.length > 0 ? (
+          <div className="flex items-center justify-center gap-2 flex-wrap text-[12px] text-ash mb-8">
+            <span className="text-smoke">{t('run.emptyDestinationLabel')}</span>
+            {activeProviders.map((slug, i) => {
+              const p = PROVIDERS.find(x => x.slug === slug);
+              if (!p) return null;
+              return (
+                <Fragment key={slug}>
+                  <span className="inline-flex items-center gap-1.5">
+                    <ProviderMark slug={slug} size={16}/>
+                    <span className="text-bone">{p.name}</span>
+                  </span>
+                  {i < activeProviders.length - 1 && <span className="text-smoke">·</span>}
+                </Fragment>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-[12px] text-amber text-center mb-8">
+            {t('run.composeNoProviders')}
+          </p>
+        )}
+        {composeNode}
+        <div className="mt-8 flex flex-wrap gap-1.5 justify-center">
+          {BENCHMARK_TEMPLATES.map(tpl => {
+            const localized = t('run.tplPrompts.' + tpl.id) || tpl.prompt;
+            return (
+              <button
+                key={tpl.id}
+                onClick={() => onPick(localized)}
+                className="px-3 py-1.5 text-[12px] border border-ink-500 hover:border-brand hover:text-brand text-ash transition-colors"
+              >
+                {t('run.tpl' + tpl.id.charAt(0).toUpperCase() + tpl.id.slice(1))}
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>
   );
 }
 
-function SingleProviderResult({ run }) {
+// MessageList — top-to-bottom render of user bubbles + assistant rows.
+// Last assistant row gets the Regenerate button; last user msg is editable.
+function MessageList({
+  messages, onThumb, onRetry,
+  onRegenerate, canRegenerate,
+  editingId, editDraft, onEditDraftChange, onStartEdit, onCancelEdit, onSubmitEdit, canEdit,
+}) {
+  // Index of the last assistant message (for Regenerate button)
+  const lastAssistantId = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'assistant') return messages[i].id;
+    }
+    return null;
+  }, [messages]);
+  // Index of the last user message (for Edit button)
+  const lastUserId = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') return messages[i].id;
+    }
+    return null;
+  }, [messages]);
+
+  return (
+    <div className="space-y-6">
+      {messages.map(m =>
+        m.role === 'user'
+          ? <UserBubble
+              key={m.id}
+              msg={m}
+              isLast={m.id === lastUserId}
+              canEdit={canEdit}
+              isEditing={editingId === m.id}
+              editDraft={editDraft}
+              onEditDraftChange={onEditDraftChange}
+              onStartEdit={onStartEdit}
+              onCancelEdit={onCancelEdit}
+              onSubmitEdit={onSubmitEdit}
+            />
+          : <AssistantRow
+              key={m.id}
+              row={m}
+              onThumb={onThumb}
+              onRetry={onRetry}
+              isLast={m.id === lastAssistantId}
+              onRegenerate={onRegenerate}
+              canRegenerate={canRegenerate}
+            />
+      )}
+    </div>
+  );
+}
+
+// User message — right-aligned bubble (chat convention: user on right).
+// Last user msg gets an Edit button on hover; clicking enters an inline edit
+// mode (textarea + Cancel/Resubmit). Resubmit truncates all subsequent turns
+// and re-fans-out a fresh turn with the new content.
+function UserBubble({
+  msg, isLast, canEdit,
+  isEditing, editDraft, onEditDraftChange, onStartEdit, onCancelEdit, onSubmitEdit,
+}) {
   const { t } = useLang();
-  const r = run.providers[0];
+  const time = new Date(msg.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const showEditAffordance = isLast && canEdit && !isEditing;
+
+  if (isEditing) {
+    return (
+      <div className="flex justify-end">
+        <div className="w-full max-w-[90%] sm:max-w-[80%] md:max-w-[70%]">
+          <textarea
+            value={editDraft}
+            onChange={e => onEditDraftChange(e.target.value)}
+            onKeyDown={(e) => {
+              if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); onSubmitEdit(); }
+              if (e.key === 'Escape') onCancelEdit();
+            }}
+            autoFocus
+            rows={3}
+            className="w-full bg-ink-800 border border-brand/60 outline-none p-3 text-[14px] resize-y text-bone leading-relaxed"
+            style={{ minHeight: 72 }}
+          />
+          <div className="mt-2 flex items-center justify-end gap-2">
+            <button onClick={onCancelEdit} className="btn-ghost px-3 py-1.5 text-[12px]">
+              {t('run.editCancel')}
+            </button>
+            <button
+              onClick={onSubmitEdit}
+              disabled={!editDraft.trim()}
+              className="btn-brand px-3 py-1.5 text-[12px] inline-flex items-center gap-1.5 disabled:opacity-40"
+            >
+              <I.refresh className="w-3 h-3"/> {t('run.editResubmit')}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex justify-end group">
+      <div className="max-w-[90%] sm:max-w-[70%] md:max-w-[60%]">
+        <div className="micro text-smoke mb-1 text-right flex items-center justify-end gap-2">
+          {showEditAffordance && (
+            <button
+              onClick={() => onStartEdit(msg)}
+              className="opacity-0 group-hover:opacity-100 transition-opacity text-smoke hover:text-bone inline-flex items-center gap-1"
+              title={t('run.editBtn')}
+            >
+              <I.refresh className="w-3 h-3"/>
+              <span className="micro">{t('run.editBtn')}</span>
+            </button>
+          )}
+          <span>{t('run.youLabel')} · {time}</span>
+        </div>
+        <div className="bg-ink-700/60 border border-ink-500 px-4 py-2.5 text-bone text-[14px] leading-relaxed whitespace-pre-wrap">
+          {msg.content}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// AssistantRow — one assistant turn = N response cards in a responsive grid.
+// The last assistant row (when nothing is in-flight) gets a footer Regenerate
+// button so the user can re-roll the same prompt across providers.
+function AssistantRow({ row, onThumb, onRetry, isLast, onRegenerate, canRegenerate }) {
+  const { t } = useLang();
+  const n = row.responses.length;
+  const gridCls = n === 1 ? 'grid-cols-1'
+                : n === 2 ? 'grid-cols-1 md:grid-cols-2'
+                : n === 3 ? 'grid-cols-1 md:grid-cols-3'
+                :           'grid-cols-1 md:grid-cols-2 lg:grid-cols-3';
+  const allDone = row.responses.every(r => r.status === 'completed' || r.status === 'failed' || r.status === 'cancelled');
+  const showRegenerate = isLast && canRegenerate && allDone;
+  return (
+    <div>
+      <div className={cx('grid gap-3', gridCls)}>
+        {row.responses.map(r => (
+          <ResponseCard
+            key={r.slug}
+            r={r}
+            turnId={row.turnId}
+            onThumb={onThumb}
+            onRetry={onRetry}
+          />
+        ))}
+      </div>
+      {showRegenerate && (
+        <div className="mt-2 flex justify-end">
+          <button
+            onClick={onRegenerate}
+            className="px-3 py-1.5 text-[11px] border border-ink-500 hover:border-bone/40 text-ash hover:text-bone inline-flex items-center gap-1.5 transition-colors"
+            title={t('run.regenerateBtn')}
+          >
+            <I.refresh className="w-3 h-3"/> {t('run.regenerateBtn')}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ResponseCard — single provider's response within an assistant turn.
+// Pending / running / completed / failed states; inline thumbs + copy + retry.
+// MarkdownBody — renders text as parsed markdown using the global `marked`.
+// Falls back to plain pre if `marked` isn't loaded (e.g. CDN failure).
+// dangerouslySetInnerHTML is safe here because marked v11 escapes raw HTML
+// by default (no `html: true` flag) and content comes from our own mock
+// response generator. When wiring real provider output, ensure server-side
+// sanitization or switch to a sanitizer like DOMPurify.
+function MarkdownBody({ text }) {
+  const html = useMemo(() => {
+    if (!text) return '';
+    if (typeof window === 'undefined' || !window.marked) {
+      return null; // signal: render fallback
+    }
+    try {
+      return window.marked.parse(text, { breaks: true, gfm: true });
+    } catch {
+      return null;
+    }
+  }, [text]);
+
+  if (html === null) {
+    return (
+      <pre className="whitespace-pre-wrap text-[12.5px] leading-relaxed text-bone font-mono">{text}</pre>
+    );
+  }
+  return <div className="md-body" dangerouslySetInnerHTML={{ __html: html }}/>;
+}
+
+function ResponseCard({ r, turnId, onThumb, onRetry }) {
+  const { t } = useLang();
+  const toast = useToast();
   const p = PROVIDERS.find(x => x.slug === r.slug);
-  const responseText = r.status === 'completed' ? (r.response || '') : '';
+  const responseText = r.status === 'completed' ? (r.content || '') : '';
   const stream = useStreamingText(responseText, 14);
 
   const phaseLabel = {
@@ -4191,644 +4693,206 @@ function SingleProviderResult({ run }) {
     running: t('run.phaseStreaming'),
     completed: t('run.phaseComplete'),
     failed: t('run.phaseFailed'),
+    cancelled: t('run.phaseCancelled'),
   }[r.status];
-  const phaseTone = r.status === 'failed' ? 'text-coral' : r.status === 'completed' ? 'text-ash' : 'text-brand';
 
-  // Cheaper alternative — flag when current provider isn't the global cheapest
-  const cheaperAlt = useMemo(() => {
-    const cheapest = [...PROVIDERS].sort((a, b) => a.cost - b.cost)[0];
-    if (cheapest.slug === p.slug) return null;
-    const savings = Math.round(((p.cost - cheapest.cost) / p.cost) * 100);
-    if (savings < 8) return null;
-    return { provider: cheapest, savings };
-  }, [p.slug]);
+  const onCopy = () => {
+    if (!r.content) return;
+    copyToClipboard(r.content);
+    toast.show(t('run.copiedResponse', { name: p.name }));
+  };
 
   return (
-    <div className="flex flex-col">
-      {/* Header strip */}
-      <div className="flex items-center justify-between border-b border-ink-600 pb-4 mb-4 gap-3 flex-wrap">
-        <div className="flex items-center gap-3">
-          <ProviderMark slug={r.slug}/>
-          <div>
-            <div className="text-[14px] text-bone">{p.name}</div>
-            <div className="micro text-smoke flex items-center gap-2">
-              <span>{p.type}</span>
-              <span>·</span>
-              <span className="inline-flex items-center gap-1">
-                {r.status === 'running' && <span className="w-1.5 h-1.5 bg-brand rounded-full pulse-dot"/>}
-                {r.status === 'completed' && stream.done && <span className="w-1.5 h-1.5 bg-brand rounded-full"/>}
-                {r.status === 'failed' && <span className="w-1.5 h-1.5 bg-coral rounded-full"/>}
-                <span className={phaseTone}>{r.status === 'completed' && !stream.done ? t('run.phaseStreaming') : phaseLabel}</span>
+    <div className="card p-4 flex flex-col">
+      {/* Header strip — provider mark + phase pill + trust */}
+      <div className="flex items-center justify-between gap-2 pb-3 border-b border-ink-600">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <ProviderMark slug={r.slug} size={28}/>
+          <div className="min-w-0">
+            <div className="text-[13px] text-bone truncate">{p.name}</div>
+            <div className="micro text-smoke flex items-center gap-1.5">
+              {r.status === 'running' && <span className="w-1.5 h-1.5 bg-brand rounded-full pulse-dot"/>}
+              {r.status === 'completed' && stream.done && <span className="w-1.5 h-1.5 bg-brand rounded-full"/>}
+              {r.status === 'completed' && !stream.done && <span className="w-1.5 h-1.5 bg-brand rounded-full pulse-dot"/>}
+              {r.status === 'failed' && <span className="w-1.5 h-1.5 bg-coral rounded-full"/>}
+              {r.status === 'cancelled' && <span className="w-1.5 h-1.5 bg-smoke rounded-full"/>}
+              {r.status === 'pending' && <span className="w-1.5 h-1.5 bg-smoke rounded-full"/>}
+              <span className={cx(
+                r.status === 'failed' ? 'text-coral'
+                : r.status === 'cancelled' ? 'text-smoke'
+                : r.status === 'completed' ? 'text-ash'
+                : 'text-brand'
+              )}>
+                {(r.status === 'completed' && !stream.done) ? t('run.phaseStreaming') : phaseLabel}
               </span>
             </div>
           </div>
         </div>
-        <TrustBadge score={p.trust} size="lg"/>
+        <TrustBadge score={p.trust}/>
       </div>
 
-      {/* Output */}
-      <div className="flex-1 min-h-[280px] py-2">
+      {/* Body */}
+      <div className="py-3 flex-1 min-h-[140px]">
         {r.status === 'pending' && (
-          <div className="micro text-smoke flex items-center gap-2"><span className="w-1.5 h-1.5 bg-smoke rounded-full"/>{t('run.phaseQueued')}</div>
+          <div className="text-[12px] text-smoke">{t('run.phaseQueued')}…</div>
         )}
         {r.status === 'running' && (
-          <div className="space-y-2 text-[13px] text-ash">
-            <div className="micro text-brand flex items-center gap-2 mb-3">
-              <I.spin className="w-3 h-3 animate-spin"/> {t('run.connectingTo', { name: p.name })}
-            </div>
-            <div className="shimmer h-3 w-2/3"></div>
-            <div className="shimmer h-3 w-3/4"></div>
-            <div className="shimmer h-3 w-1/2"></div>
+          <div className="space-y-2">
+            <div className="shimmer h-2.5 w-3/4"></div>
+            <div className="shimmer h-2.5 w-5/6"></div>
+            <div className="shimmer h-2.5 w-1/2"></div>
+          </div>
+        )}
+        {r.status === 'cancelled' && (
+          <div className="text-smoke text-[12px]">
+            <I.x className="w-3.5 h-3.5 inline mr-1"/>
+            {t('run.phaseCancelled')}
           </div>
         )}
         {r.status === 'failed' && (
-          <div className="text-coral text-[13px]">
-            <I.x className="w-4 h-4 inline mr-1"/>
+          <div className="text-coral text-[12px]">
+            <I.x className="w-3.5 h-3.5 inline mr-1"/>
             {t('run.failedPrefix')}{r.error}
           </div>
         )}
         {r.status === 'completed' && (
-          <pre className="whitespace-pre-wrap text-[13px] leading-relaxed text-bone font-mono overflow-y-auto pr-2">
-            {stream.shown}
-            {!stream.done && <span className="inline-block w-2 h-4 bg-brand ml-0.5 align-middle pulse-dot"></span>}
-          </pre>
+          // While streaming, render as plain sans-serif (matches post-stream
+          // markdown body) so the typeface doesn't jump when stream.done flips.
+          // Once done, switch to MarkdownBody for proper markdown / code blocks.
+          stream.done
+            ? <MarkdownBody text={stream.shown}/>
+            : (
+              <div className="whitespace-pre-wrap text-[12.5px] leading-[1.55] text-bone">
+                {stream.shown}
+                <span className="inline-block w-1.5 h-3.5 bg-brand ml-0.5 align-middle pulse-dot"></span>
+              </div>
+            )
         )}
       </div>
 
-      {/* Bottom stats + pay */}
-      <div className="mt-4 pt-4 border-t border-ink-600 flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-6 overflow-x-auto no-scroll-x">
-          <div className="shrink-0">
-            <div className="micro text-smoke">{t('run.colCost')}</div>
-            <div className="num text-bone text-[14px] mt-1">{r.cost != null ? fmtUSD(r.cost, 4) : '—'}</div>
-          </div>
-          <div className="shrink-0">
-            <div className="micro text-smoke">{t('run.colLatency')}</div>
-            <div className="num text-bone text-[14px] mt-1">{r.latency != null ? r.latency.toFixed(2) + 's' : '—'}</div>
-          </div>
-          <div className="shrink-0">
-            <div className="micro text-smoke">{t('run.colTtft')}</div>
-            <div className="num text-bone text-[14px] mt-1">{r.ttft != null ? (r.ttft * 1000).toFixed(0) + 'ms' : '—'}</div>
-          </div>
-          <div className="shrink-0">
-            <div className="micro text-smoke">{t('run.colTokens')}</div>
-            <div className="num text-bone text-[14px] mt-1">{r.outputTokens ? `${r.inputTokens} / ${r.outputTokens}` : '—'}</div>
-          </div>
-          <div className="shrink-0">
-            <div className="micro text-smoke">{t('run.colTrust')}</div>
-            <div className="num text-bone text-[14px] mt-1">{p.trust}</div>
-          </div>
+      {/* Footer — metrics + thumbs/copy/retry */}
+      <div className="mt-2 pt-3 border-t border-ink-600 flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-3 text-[11px] num text-ash overflow-x-auto no-scroll-x">
+          {r.ttft != null && <span title={t('run.colTtft')}>{(r.ttft * 1000) | 0}ms</span>}
+          {r.latency != null && <span title={t('run.colLatency')}>{r.latency.toFixed(2)}s</span>}
+          {r.cost != null && <span title={t('run.colCost')}>{fmtUSD(r.cost, 4)}</span>}
+          {r.outputTokens != null && <span title={t('run.colTokens')}>{r.inputTokens}/{r.outputTokens}</span>}
         </div>
-        {cheaperAlt && (
-          <span className="text-[12px] text-amber">
-            {t('run.cheaperLabel')} <span className="text-brand">{cheaperAlt.provider.name} (−{cheaperAlt.savings}%)</span>
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function RecentRuns({ history, onClear, onReuse }) {
-  const { t } = useLang();
-  const toast = useToast();
-  return (
-    <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 mt-12">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <div className="micro text-smoke">{t('run.recentRuns')}</div>
-          <h3 className="serif text-3xl sm:text-4xl lg:text-5xl tracking-editorial mt-1">{t('run.yourLast')} <span className="serif-it text-brand">{history.length}</span></h3>
-        </div>
-        <button onClick={onClear} className="micro text-smoke hover:text-bone">{t('run.clear')}</button>
-      </div>
-      <div className="space-y-px bg-ink-600 border border-ink-600">
-        {history.map(h => {
-          const completed = h.providers.filter(r => r.status === 'completed');
-          const totalCost = completed.reduce((s, r) => s + (r.cost || 0), 0);
-          const isCompare = h.providers.length > 1;
-          return (
-            <div key={h.id} className="bg-ink p-4 flex flex-col md:grid md:grid-cols-[200px_1fr_auto] gap-3 md:gap-4 md:items-center">
-              <div className="flex items-center gap-2">
-                <div className="flex -space-x-2">
-                  {h.providers.slice(0, 3).map(r => (
-                    <div key={r.slug} className="ring-1 ring-ink rounded-sm">
-                      <ProviderMark slug={r.slug} size={28}/>
-                    </div>
-                  ))}
-                  {h.providers.length > 3 && (
-                    <div className="w-7 h-7 flex items-center justify-center bg-ink-700 text-ash text-[10px] num ring-1 ring-ink">+{h.providers.length - 3}</div>
-                  )}
-                </div>
-                <div className="ml-1">
-                  <div className="text-[13px] text-bone">{isCompare ? t('run.providersCount', { n: h.providers.length }) : PROVIDERS.find(p => p.slug === h.providers[0].slug)?.name}</div>
-                  <div className="micro text-smoke">{isCompare ? t('run.modeCompare') : t('run.modeSingleShort')} · {h.modelDisplay}</div>
-                </div>
-              </div>
-              <div className="text-[12px] text-ash line-clamp-2 md:truncate">{h.prompt}</div>
-              <div className="flex items-center justify-between md:justify-start gap-6">
-                <div className="text-left md:text-right">
-                  <div className="num text-[12px] text-bone">{fmtUSD(totalCost, 4)}</div>
-                  <div className="micro text-smoke">{t('run.okFraction', { c: completed.length, t: h.providers.length })}</div>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => {
-                      const r = h.providers.find(r => r.status === 'completed');
-                      if (r?.response) { copyToClipboard(r.response); toast.show(t('run.responseCopied')); }
-                    }}
-                    title={t('run.copyFirst')}
-                    className="text-smoke hover:text-bone p-1.5"
-                  ><I.copy className="w-3.5 h-3.5"/></button>
-                  <button
-                    onClick={() => onReuse(h)}
-                    title={t('run.reUse')}
-                    className="text-smoke hover:text-bone p-1.5"
-                  ><I.refresh className="w-3.5 h-3.5"/></button>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function RunStatusList({ run, onRetry }) {
-  const { t } = useLang();
-  const allDone = run.providers.every(r => r.status === 'completed' || r.status === 'failed');
-  const completedCount = run.providers.filter(r => r.status === 'completed').length;
-  const failedCount = run.providers.filter(r => r.status === 'failed').length;
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <div className="micro text-smoke">{t('run.runIdLabel')}<span className="num">{run.id}</span> · <span className="text-ash">{t('run.benchDetected.' + (run.benchmark || 'default'))}</span></div>
-          <div className="serif text-2xl tracking-editorial mt-1">
-            {allDone ? (
-              <Fragment>{t('run.compareComplete')} <span className="serif-it text-brand">{t('run.compareCompleteIt')}</span></Fragment>
-            ) : (
-              <Fragment>{t('run.runningCompare')}<span className="serif-it text-brand">.</span></Fragment>
-            )}
-          </div>
-        </div>
-        <div className="text-right">
-          <div className="micro text-smoke">{t('run.compareCompletedFraction', { c: completedCount, t: run.providers.length })}</div>
-          {failedCount > 0 && <div className="micro text-coral mt-0.5">{t('run.compareFailedCount', { n: failedCount })}</div>}
+        <div className="flex items-center gap-1">
+          {r.status === 'completed' && (
+            <Fragment>
+              <button
+                onClick={() => onThumb(turnId, r.slug, 'up')}
+                title={t('run.thumbUpTip')}
+                className={cx('p-1.5 transition-colors', r.thumb === 'up' ? 'text-brand' : 'text-smoke hover:text-bone')}
+              >
+                <I.thumbsUp className="w-3.5 h-3.5"/>
+              </button>
+              <button
+                onClick={() => onThumb(turnId, r.slug, 'down')}
+                title={t('run.thumbDownTip')}
+                className={cx('p-1.5 transition-colors', r.thumb === 'down' ? 'text-coral' : 'text-smoke hover:text-bone')}
+              >
+                <I.thumbsDown className="w-3.5 h-3.5"/>
+              </button>
+              <button onClick={onCopy} title={t('run.copyResponse')} className="text-smoke hover:text-bone p-1.5 transition-colors">
+                <I.copy className="w-3.5 h-3.5"/>
+              </button>
+            </Fragment>
+          )}
+          {r.status === 'failed' && (
+            <button
+              onClick={() => onRetry(turnId, r.slug)}
+              title={t('run.retryThis')}
+              className="px-2 py-1 text-[11px] border border-ink-600 hover:border-bone/40 text-ash hover:text-bone inline-flex items-center gap-1 transition-colors"
+            >
+              <I.refresh className="w-3 h-3"/> {t('run.retry')}
+            </button>
+          )}
         </div>
       </div>
-      <div className="space-y-2">
-        {run.providers.map(r => {
-          const provider = PROVIDERS.find(p=>p.slug===r.slug);
-          const ic = {
-            pending: <span className="text-smoke">○</span>,
-            running: <I.spin className="w-3.5 h-3.5 text-brand animate-spin"/>,
-            completed: <I.check className="w-3.5 h-3.5 text-brand"/>,
-            failed: <I.x className="w-3.5 h-3.5 text-coral"/>,
-          }[r.status];
-          return (
-            <div key={r.slug} className={cx(
-              'flex items-center gap-4 px-4 py-3 border transition-colors',
-              r.status === 'running' ? 'border-brand/40' :
-              r.status === 'failed' ? 'border-coral/30' : 'border-ink-600'
-            )}>
-              <div className="w-5 flex items-center justify-center">{ic}</div>
-              <ProviderMark slug={r.slug}/>
-              <div className="flex-1">
-                <div className="text-[13px] text-bone">{provider.name}</div>
-                <div className="micro text-smoke">
-                  {r.status === 'pending' && t('run.phaseQueuedShort')}
-                  {r.status === 'running' && t('run.phaseStreamingShort')}
-                  {r.status === 'completed' && t('run.returnedIn', { l: r.latency.toFixed(2), ms: (r.ttft*1000).toFixed(0) })}
-                  {r.status === 'failed' && r.error}
-                </div>
-              </div>
-              {r.status === 'completed' && (
-                <div className="text-right num text-[12px]">
-                  <div className="text-bone">{fmtUSD(r.cost, 4)}</div>
-                  <div className="text-smoke text-[11px]">{r.outputTokens} out</div>
-                </div>
-              )}
-              {r.status === 'running' && (
-                <div className="w-24 h-px bg-ink-500 relative overflow-hidden shimmer"></div>
-              )}
-              {r.status === 'failed' && (
-                <button
-                  onClick={() => onRetry(r.slug)}
-                  className="text-[11px] text-ash hover:text-bone inline-flex items-center gap-1.5 px-2.5 py-1 border border-ink-500 hover:border-bone transition-colors"
-                >
-                  <I.refresh className="w-3 h-3"/> {t('run.retry')}
-                </button>
-              )}
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 }
 
-function SummaryCards({ run }) {
+// ComposeBox — single unified bordered container. Textarea fills the space;
+// the action button at bottom-right swaps Send ↔ Stop based on `inFlight`.
+// Cmd/Ctrl+Enter submits when not in flight.
+function ComposeBox({ value, onChange, onSubmit, onStop, inFlight, disabled, disabledReason, inputRef, providerCount }) {
   const { t } = useLang();
-  const completed = run.providers.filter(r => r.status === 'completed' && r.scores);
-  if (!completed.length) return null;
+  const localRef = useRef(null);
+  const textareaRef = inputRef || localRef;
 
-  const cheapest = [...completed].sort((a,b) => a.cost - b.cost)[0];
-  const fastest = [...completed].sort((a,b) => a.latency - b.latency)[0];
-  const trusted = [...completed].sort((a,b) => {
-    const tA = PROVIDERS.find(p=>p.slug===a.slug).trust;
-    const tB = PROVIDERS.find(p=>p.slug===b.slug).trust;
-    return tB - tA;
-  })[0];
-  const recommended = [...completed].sort((a,b) => b.scores.overall - a.scores.overall)[0];
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 180) + 'px';
+  }, [value]);
 
-  const recProvider = PROVIDERS.find(p=>p.slug===recommended.slug);
-  const cheapProvider = PROVIDERS.find(p=>p.slug===cheapest.slug);
-  const fastProvider = PROVIDERS.find(p=>p.slug===fastest.slug);
-  const trustProvider = PROVIDERS.find(p=>p.slug===trusted.slug);
-
-  const avgCost = completed.reduce((s,c) => s + c.cost, 0) / completed.length;
-  const cheapPct = Math.round((avgCost / cheapest.cost - 1) * 100);
-
-  return (
-    <div>
-      <div className="micro text-smoke mb-3">{t('run.verdictRouters', { n: completed.length })}</div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-ink-600">
-        <SumCard tag={t('run.sumCheapest')} name={cheapProvider.name} value={fmtUSD(cheapest.cost, 4)} sub={t('run.sumCheapVsAvg', { pct: cheapPct })} tone="brand" slug={cheapest.slug}/>
-        <SumCard tag={t('run.sumFastest')} name={fastProvider.name} value={`${fastest.latency.toFixed(2)}s`} sub={t('run.sumTtftMs', { ms: (fastest.ttft*1000).toFixed(0) })} tone="sky" slug={fastest.slug}/>
-        <SumCard tag={t('run.sumMostTrusted')} name={trustProvider.name} value={trustProvider.trust} sub={trustLabel(trustProvider.trust)} tone={trustTone(trustProvider.trust)} slug={trusted.slug}/>
-        <SumCard tag={t('run.sumRecommended')} name={recProvider.name} value={recommended.scores.overall} sub={t('run.sumBestBalance')} tone="brand" slug={recommended.slug} highlight/>
-      </div>
-    </div>
-  );
-}
-
-function SumCard({ tag, name, value, sub, tone, slug, highlight }) {
-  const tColor = { brand: 'text-brand', sky: 'text-sky', amber: 'text-amber', coral: 'text-coral' }[tone] || 'text-bone';
-  return (
-    <div className={cx('p-6 bg-ink', highlight && 'ring-1 ring-brand')}>
-      <div className="flex items-center justify-between">
-        <div className="micro text-smoke">{tag}</div>
-        <ProviderMark slug={slug}/>
-      </div>
-      <div className="mt-4">
-        <div className="text-[13px] text-ash">{name}</div>
-        <div className={cx('serif text-5xl mt-1 tracking-editorial', tColor)}>{value}</div>
-        <div className="text-[11px] text-smoke mt-1">{sub}</div>
-      </div>
-    </div>
-  );
-}
-
-// Per-card response body in compare mode. Streams the text in like an LLM
-// (token-by-token via useStreamingText) and shows a blinking cursor while
-// not yet finished. Each card runs its own stream so providers that finish
-// later visibly stream after providers that finished early.
-function StreamingCardBody({ text, isExpanded }) {
-  const stream = useStreamingText(text || '', 16);
-  return (
-    <div className={cx(
-      'mt-3 flex-1 text-[12px] leading-relaxed text-ash whitespace-pre-wrap font-mono overflow-y-auto pr-2',
-      isExpanded ? '' : 'max-h-[260px] gradient-mask-bottom'
-    )}>
-      {stream.shown}
-      {!stream.done && text && (
-        <span className="inline-block w-1.5 h-3 bg-brand ml-0.5 align-middle pulse-dot"/>
-      )}
-    </div>
-  );
-}
-
-function ResponseGrid({ run }) {
-  const { t } = useLang();
-  // Render every selected provider — pending/running/completed/failed —
-  // so faster routers visibly stream while slower ones still load.
-  const visible = run.providers;
-  const [expanded, setExpanded] = useState({});
-  const toast = useToast();
-
-  const colCount = Math.min(visible.length, 4);
-  const colCls = colCount === 1 ? 'md:grid-cols-1' :
-                 colCount === 2 ? 'md:grid-cols-2' :
-                 colCount === 3 ? 'md:grid-cols-3 xl:grid-cols-3' :
-                                  'md:grid-cols-2 xl:grid-cols-4';
-
-  return (
-    <div>
-      <div className="micro text-smoke mb-3">{t('run.sideBySide')}</div>
-      <div className={cx('grid grid-cols-1 gap-px bg-ink-600', colCls)}>
-        {visible.map(r => {
-          const p = PROVIDERS.find(x=>x.slug===r.slug);
-          const isExpanded = expanded[r.slug];
-          return (
-            <div key={r.slug} className="bg-ink p-5 flex flex-col">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <ProviderMark slug={r.slug}/>
-                  <div>
-                    <div className="text-[13px] text-bone">{p.name}</div>
-                    <div className="micro text-smoke">{p.type}</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1">
-                  {r.response && (
-                    <Fragment>
-                      <button
-                        onClick={() => { copyToClipboard(r.response); toast.show(t('run.copiedResponse', { name: p.name })); }}
-                        title={t('run.copyResponse')}
-                        className="text-smoke hover:text-bone p-1"
-                      ><I.copy className="w-3.5 h-3.5"/></button>
-                      <button
-                        onClick={() => setExpanded(s => ({ ...s, [r.slug]: !s[r.slug] }))}
-                        title={isExpanded ? t('run.collapse') : t('run.expand')}
-                        className="text-smoke hover:text-bone p-1 text-[10px] num"
-                      >{isExpanded ? '−' : '+'}</button>
-                    </Fragment>
-                  )}
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-2 py-3 border-y border-ink-600 text-[11px]">
-                <div>
-                  <div className="micro text-smoke mb-1">{t('run.colCost')}</div>
-                  <div className="num text-bone">{r.cost != null ? fmtUSD(r.cost, 4) : '—'}</div>
-                </div>
-                <div>
-                  <div className="micro text-smoke mb-1">{t('run.colLatency')}</div>
-                  <div className="num text-bone">{r.latency != null ? r.latency.toFixed(2)+'s' : '—'}</div>
-                </div>
-                <div>
-                  <div className="micro text-smoke mb-1">{t('run.colTokens')}</div>
-                  <div className="num text-bone">{r.outputTokens || '—'}</div>
-                </div>
-              </div>
-              {r.status === 'failed' ? (
-                <div className="mt-3 flex-1 text-[12px] leading-relaxed font-mono pr-2 max-h-[260px] overflow-y-auto">
-                  <div className="text-coral">
-                    <I.x className="w-4 h-4 inline mb-1 mr-1"/>
-                    {t('run.failedPrefix')}{r.error}
-                  </div>
-                </div>
-              ) : r.status === 'pending' ? (
-                <div className="mt-3 flex-1 min-h-[120px] flex items-center justify-center text-[11px] text-smoke">
-                  <span className="inline-flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 bg-smoke rounded-full"/>
-                    {t('run.phaseQueuedShort')}
-                  </span>
-                </div>
-              ) : r.status === 'running' ? (
-                <div className="mt-3 flex-1 min-h-[120px] space-y-2 text-[12px]">
-                  <div className="micro text-brand flex items-center gap-2 mb-2">
-                    <I.spin className="w-3 h-3 animate-spin"/>
-                    {t('run.connectingTo', { name: p.name })}
-                  </div>
-                  <div className="shimmer h-3 w-2/3"></div>
-                  <div className="shimmer h-3 w-3/4"></div>
-                  <div className="shimmer h-3 w-1/2"></div>
-                  <div className="shimmer h-3 w-3/5"></div>
-                </div>
-              ) : (
-                <StreamingCardBody text={r.response} isExpanded={isExpanded}/>
-              )}
-              <div className="mt-3 pt-3 border-t border-ink-600 flex items-center justify-between">
-                <TrustBadge score={p.trust}/>
-                {r.status === 'failed' ? (
-                  <span className="text-[10px] text-coral micro">{t('run.phaseFailed')}</span>
-                ) : r.status === 'running' ? (
-                  <span className="text-[10px] text-brand micro flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 bg-brand rounded-full pulse-dot"/>
-                    {t('run.phaseStreaming')}
-                  </span>
-                ) : r.status === 'completed' ? (
-                  <span className="text-[10px] text-brand micro flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 bg-brand rounded-full"/>
-                    {t('run.phaseComplete')}
-                  </span>
-                ) : (
-                  <span className="text-[10px] text-smoke micro">{t('run.phaseQueued')}</span>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function EvaluationTable({ run }) {
-  const { t } = useLang();
-  const completed = run.providers.filter(r => r.status === 'completed' && r.scores);
-  if (!completed.length) return null;
-
-  const rows = [...completed]
-    .map(r => ({ ...r, p: PROVIDERS.find(x=>x.slug===r.slug) }))
-    .sort((a, b) => b.scores.overall - a.scores.overall);
-
-  const winner = rows[0];
-
-  return (
-    <div>
-      <div className="micro text-smoke mb-3">{t('run.scorecardLabel')}</div>
-      <div className="border border-ink-600 overflow-x-auto">
-        <div className="min-w-[640px]">
-          <div className="grid grid-cols-[2fr_repeat(4,_1fr)_80px] px-5 py-3 micro text-smoke border-b border-ink-600 bg-ink-800/30">
-            <div>{t('run.scoProvider')}</div>
-            <div className="text-right">{t('run.scoL1')}</div>
-            <div className="text-right">{t('run.scoL3')}</div>
-            <div className="text-right">{t('run.scoL2')}</div>
-            <div className="text-right">{t('run.scoOverall')}</div>
-            <div className="text-right">{t('run.scoTier')}</div>
-          </div>
-          {rows.map(r => (
-            <div key={r.slug} className={cx('grid grid-cols-[2fr_repeat(4,_1fr)_80px] px-5 py-4 items-center border-b border-ink-600 last:border-0',
-              r.slug === winner.slug && 'bg-brand/5')}>
-              <div className="flex items-center gap-3">
-                <ProviderMark slug={r.slug}/>
-                <span className="text-bone text-[13px]">{r.p.name}</span>
-                {r.slug === winner.slug && <span className="micro text-brand">{t('run.scoBest')}</span>}
-              </div>
-              <ScoreCell value={r.scores.L1}/>
-              <ScoreCell value={r.scores.L3}/>
-              <ScoreCell value={r.scores.L2}/>
-              <ScoreCell value={r.scores.overall} bold/>
-              <div className="text-right">
-                <TierChip tier={r.scores.tier}/>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="mt-3 text-[11px] text-smoke leading-relaxed max-w-3xl">
-        {t('run.scoMethodologyNote')} <a href="#/docs" className="ulink text-ash">{t('run.scoMethodology')}</a>.
-      </div>
-    </div>
-  );
-}
-
-function ScoreCell({ value, bold }) {
-  const tone = value >= 88 ? 'brand' : value >= 70 ? 'amber' : 'coral';
-  const colors = { brand: 'text-brand', amber: 'text-amber', coral: 'text-coral' };
-  return (
-    <div className="text-right">
-      <div className={cx('num', bold ? 'text-base' : 'text-[13px]', colors[tone])}>{value}</div>
-      <div className="mt-1 ml-auto h-px relative overflow-hidden bg-ink-500" style={{ width: 80 }}>
-        <div className={cx(
-          tone === 'brand' ? 'bg-brand' : tone === 'amber' ? 'bg-amber' : 'bg-coral',
-          'absolute inset-y-0 right-0'
-        )} style={{ width: `${value}%` }}></div>
-      </div>
-    </div>
-  );
-}
-
-function DifferenceAnalysis({ run }) {
-  const { t } = useLang();
-  const completed = run.providers.filter(r => r.status === 'completed');
-  if (completed.length < 2) return null;
-  const longest = completed.reduce((a, b) => (a.outputTokens > b.outputTokens ? a : b));
-  const shortest = completed.reduce((a, b) => (a.outputTokens < b.outputTokens ? a : b));
-  const longestP = PROVIDERS.find(p=>p.slug===longest.slug);
-  const shortestP = PROVIDERS.find(p=>p.slug===shortest.slug);
-
-  const median = (arr) => {
-    const s = [...arr].sort((a,b) => a-b);
-    return s[Math.floor(s.length/2)];
-  };
-  const medOut = median(completed.map(r => r.outputTokens));
-  const drift = completed.find(r => r.outputTokens > medOut * 1.35 || r.outputTokens < medOut * 0.65);
-  const driftP = drift ? PROVIDERS.find(p => p.slug === drift.slug) : null;
-
-  const benchKey = run.benchmark || 'default';
-  const benchKeyCap = benchKey.charAt(0).toUpperCase() + benchKey.slice(1);
-  const commentary = t('run.bench' + benchKeyCap);
-
-  // Trust flags
-  const trustFlags = [];
-  completed.forEach(r => {
-    const p = PROVIDERS.find(x => x.slug === r.slug);
-    if (p.trustParts.fallbackTransparency < 75) {
-      trustFlags.push(t('run.diffTrustFlag', { name: p.name, score: p.trustParts.fallbackTransparency }));
+  const onKeyDown = (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault();
+      if (!inFlight) onSubmit();
     }
+  };
+
+  const placeholder = t('run.composePlaceholder', {
+    n: providerCount,
+    s: providerCount === 1 ? '' : 's',
   });
 
-  const failedCount = run.providers.filter(r => r.status === 'failed').length;
+  const canSend = !disabled && !inFlight && value.trim().length > 0;
+  // Textarea stays editable during inFlight so the user can prep their next
+  // message while waiting — only the Send action is replaced by Stop.
 
   return (
     <div>
-      <div className="micro text-smoke mb-3">{t('run.diffLabel')}</div>
-      <div className="card p-6 grid md:grid-cols-2 gap-6">
-        <div>
-          <h4 className="serif text-2xl tracking-editorial">{t('run.diffWhatWeNoticed')}</h4>
-          <ul className="mt-4 space-y-2.5 text-[13px] leading-relaxed">
-            <li className="flex gap-2"><span className="text-brand shrink-0">+</span><span><span className="text-bone">{longestP.name}</span> {t('run.diffLongest', { tok: longest.outputTokens })}</span></li>
-            <li className="flex gap-2"><span className="text-amber shrink-0">~</span><span><span className="text-bone">{shortestP.name}</span> {t('run.diffShortest', { tok: shortest.outputTokens, pct: Math.round((shortest.outputTokens / longest.outputTokens) * 100) })}</span></li>
-            <li className="flex gap-2"><span className="text-sky shrink-0">→</span><span>{commentary}</span></li>
-            {driftP && (
-              <li className="flex gap-2"><span className="text-coral shrink-0">!</span><span><span className="text-bone">{driftP.name}</span> {t('run.diffDrift', { pct: Math.round(((drift.outputTokens / medOut) - 1) * 100) })}</span></li>
-            )}
-            {failedCount > 0 && (
-              <li className="flex gap-2"><span className="text-coral shrink-0">×</span><span><span className="text-bone">{failedCount}</span> {failedCount > 1 ? t('run.diffFailedPlural') : t('run.diffFailedSingular')}</span></li>
-            )}
-            {trustFlags.slice(0, 1).map((f, i) => (
-              <li key={i} className="flex gap-2"><span className="text-amber shrink-0">⚠</span><span>{f}</span></li>
-            ))}
-          </ul>
-        </div>
-        <div>
-          <h4 className="serif text-2xl tracking-editorial">{t('run.diffOutputStats')}</h4>
-          <div className="mt-4 space-y-3">
-            {completed.map(r => {
-              const max = Math.max(...completed.map(c=>c.outputTokens));
-              const p = PROVIDERS.find(x=>x.slug===r.slug);
-              return (
-                <div key={r.slug} className="flex items-center gap-3">
-                  <div className="w-20 text-[12px] text-ash truncate">{p.name}</div>
-                  <div className="flex-1 h-1 bg-ink-500 relative overflow-hidden">
-                    <div className="absolute inset-y-0 left-0 bg-brand/60" style={{ width: `${(r.outputTokens/max)*100}%` }}></div>
-                  </div>
-                  <div className="num text-[11px] text-bone w-12 text-right">{r.outputTokens}</div>
-                </div>
-              );
-            })}
-          </div>
-          <div className="mt-5 pt-5 border-t border-ink-600 grid grid-cols-3 gap-3 text-[11px]">
-            <div>
-              <div className="micro text-smoke mb-1">{t('run.diffMedian')}</div>
-              <div className="num text-bone">{medOut}</div>
-            </div>
-            <div>
-              <div className="micro text-smoke mb-1">{t('run.diffSpread')}</div>
-              <div className="num text-bone">{Math.round(((longest.outputTokens / shortest.outputTokens) - 1) * 100)}%</div>
-            </div>
-            <div>
-              <div className="micro text-smoke mb-1">{t('run.diffConflicts')}</div>
-              <div className="text-[11px] text-smoke">{t('run.diffNoneFlagged')}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function RecommendedAction({ run }) {
-  const { t } = useLang();
-  const completed = run.providers.filter(r => r.status === 'completed' && r.scores);
-  if (!completed.length) return null;
-
-  const recommended = [...completed].sort((a,b) => b.scores.overall - a.scores.overall)[0];
-  const cheapest = [...completed].sort((a,b) => a.cost - b.cost)[0];
-  const trusted = [...completed].sort((a,b) => {
-    const tA = PROVIDERS.find(p=>p.slug===a.slug).trust;
-    const tB = PROVIDERS.find(p=>p.slug===b.slug).trust;
-    return tB - tA;
-  })[0];
-
-  const recP = PROVIDERS.find(p=>p.slug===recommended.slug);
-  const cheapP = PROVIDERS.find(p=>p.slug===cheapest.slug);
-  const trustP = PROVIDERS.find(p=>p.slug===trusted.slug);
-
-  const isSame = (p) => p.slug === recP.slug;
-
-  return (
-    <div className="card-2 p-8 ring-1 ring-brand/30 relative overflow-hidden">
-      <div className="absolute top-0 left-0 right-0 h-px bg-brand"></div>
-      <div className="grid md:grid-cols-[1fr_auto] gap-8 items-end">
-        <div>
-          <div className="micro text-smoke">{t('run.verdict')}</div>
-          <h3 className="serif text-3xl sm:text-4xl lg:text-5xl tracking-editorial mt-2">
-            {t('run.useHeadline')} <span className="serif-it text-brand">{recP.name}</span>.
-          </h3>
-          <p className="mt-3 text-ash text-[14px] max-w-xl leading-relaxed">
-            {t('run.useBody')} <span className="num text-bone">{recommended.scores.overall}</span>{t('run.useEstCost')} <span className="num text-bone">{fmtUSD(recommended.cost, 4)}</span>{t('run.useTrailer')}
-          </p>
-        </div>
-        <div className="flex flex-col gap-2 min-w-[260px]">
-          <a
-            href={`#/providers/${recP.slug}`}
-            className="btn-brand px-6 py-3 text-sm font-medium tracking-tight inline-flex items-center gap-2 justify-center"
+      <div className={cx(
+        'relative bg-ink-800 border transition-colors',
+        disabled ? 'border-ink-600' : 'border-ink-500 focus-within:border-brand/60'
+      )}>
+        <textarea
+          ref={textareaRef}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          onKeyDown={onKeyDown}
+          rows={1}
+          placeholder={placeholder}
+          disabled={disabled}
+          className="w-full bg-transparent outline-none px-4 py-3 pr-16 text-[13px] resize-none text-bone leading-relaxed disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{ minHeight: 52, maxHeight: 180 }}
+        />
+        {inFlight ? (
+          <button
+            onClick={onStop}
+            aria-label={t('run.composeStop')}
+            title={t('run.composeStop')}
+            className="absolute bottom-2 right-2 w-9 h-9 flex items-center justify-center bg-coral text-ink transition-colors hover:opacity-90"
           >
-            {t('run.useHeadline')} {recP.name} <I.arrow className="w-4 h-4"/>
-          </a>
-          {!isSame(cheapP) && (
-            <a
-              href={`#/providers/${cheapP.slug}`}
-              className="btn-ghost px-6 py-2 text-[12px] inline-flex items-center justify-between gap-3"
-            >
-              <span>{t('run.useCheapestPick', { name: cheapP.name })}</span>
-              <span className="num text-brand">{fmtUSD(cheapest.cost, 4)}</span>
-            </a>
-          )}
-          {!isSame(trustP) && (
-            <a
-              href={`#/providers/${trustP.slug}`}
-              className="btn-ghost px-6 py-2 text-[12px] inline-flex items-center justify-between gap-3"
-            >
-              <span>{t('run.useTrustedPick', { name: trustP.name })}</span>
-              <span className="num text-amber">{trustP.trust}</span>
-            </a>
-          )}
-        </div>
+            <span className="w-3 h-3 bg-ink block"></span>
+          </button>
+        ) : (
+          <button
+            onClick={onSubmit}
+            disabled={!canSend}
+            aria-label={t('run.composeSend')}
+            className={cx(
+              'absolute bottom-2 right-2 w-9 h-9 flex items-center justify-center transition-colors',
+              canSend
+                ? 'btn-brand'
+                : 'bg-ink-700 text-smoke cursor-not-allowed'
+            )}
+          >
+            <I.send className="w-4 h-4"/>
+          </button>
+        )}
+      </div>
+      <div className="mt-1.5 px-0.5 min-h-[14px] flex items-center justify-between gap-2">
+        <span className="micro text-smoke">
+          {disabledReason
+            || (inFlight ? t('run.composeInFlightHint') : t('run.composeHotkeyHint'))}
+        </span>
       </div>
     </div>
   );
@@ -6517,8 +6581,14 @@ function App() {
     page = <ProviderPage slug={slug}/>;
   } else page = <HomePage/>;
 
-  // scroll to top on route change
-  useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }); }, [path]);
+  // Scroll to top on route change. Use useLayoutEffect so the scroll fires
+  // BEFORE the browser paints the new page — otherwise the new page briefly
+  // renders at the old scroll position, causing visible jitter on nav clicks.
+  useLayoutEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }); }, [path]);
+
+  // Run page is a tool with a fixed-bottom compose — the global Footer would
+  // compete with it for the bottom of the viewport. Hide footer on /run.
+  const showFooter = !(path === '/run' || path === '/compare' || path === '/playground');
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -6526,7 +6596,7 @@ function App() {
       <main className="flex-1">
         {page}
       </main>
-      <Footer/>
+      {showFooter && <Footer/>}
     </div>
   );
 }
