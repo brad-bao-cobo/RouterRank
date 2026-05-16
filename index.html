@@ -474,6 +474,60 @@ function computeL3(s) {
 function computeOverall(p) {
   return Math.round(computeL1(p.scores) * 0.4 + computeL3(p.scores) * 0.4 + computeL2(p.scores) * 0.2);
 }
+
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+// Per-(provider, model) derived metrics. Single source of truth for everything
+// the ProviderPage shows in model context. Cost-derived L3 is REAL (uses real
+// pricing data). L1/L2/perf metrics are deterministically faked via strHash
+// anchored on the provider's platform-level scores, so:
+//   1. Same (provider, model) always yields the same numbers (refresh-safe)
+//   2. Different models on the same provider give slightly different numbers
+//      (visible feedback when user switches model)
+//   3. Numbers stay "in the ballpark" of the provider's platform reputation
+function getModelMetrics(p, modelId) {
+  const mp = p.modelPricing?.[modelId];
+  if (!mp) return null;
+  const modelMeta = MODELS.find(m => m.id === modelId);
+  const refIn  = modelMeta?.officialIn  ?? mp.listedIn;
+  const refOut = modelMeta?.officialOut ?? mp.listedOut;
+
+  // L3 is REAL — derived from how this provider's listed/observed compares to the
+  // model's official price. Markup penalty (vs official) + drift penalty (observed
+  // vs listed). Lower markup + lower drift = higher L3.
+  const listedTotal   = mp.listedIn + mp.listedOut;
+  const observedTotal = mp.observedIn + mp.observedOut;
+  const refTotal      = refIn + refOut;
+  const markup = ((listedTotal / refTotal) - 1) * 100;       // can be negative (cheaper than official)
+  const drift  = ((observedTotal / listedTotal) - 1) * 100;  // observed vs listed
+  // Markup is penalized symmetrically (under-pricing is suspicious too).
+  // Drift is asymmetric (paying more than listed is worse than paying less).
+  const L3 = Math.round(clamp(96 - Math.abs(markup) * 0.9 - (drift > 0 ? drift * 2.2 : Math.abs(drift) * 1.0), 50, 99));
+
+  // L1 / L2 are anchored on the provider's platform scores with model-specific
+  // ±5pt deterministic variation via strHash.
+  const seed = (k) => strHash(p.slug + modelId + k) % 100;
+  const L1base = computeL1(p.scores);
+  const L2base = computeL2(p.scores);
+  const L1 = Math.round(clamp(L1base + (seed('L1') - 50) / 12, 50, 99));
+  const L2 = Math.round(clamp(L2base + (seed('L2') - 50) / 12, 50, 99));
+
+  // Perf metrics: ±15% deterministic jitter around provider's platform value.
+  const jitter = (k, lo, hi) => lo + (seed(k) / 100) * (hi - lo);
+  const ttft     = +clamp(p.ttft    * jitter('ttft', 0.85, 1.15), 0.10, 2.0).toFixed(3);
+  const latency  = +clamp(p.latency * jitter('lat',  0.85, 1.15), 0.30, 5.0).toFixed(2);
+  const p95      = +clamp(p.p95     * jitter('p95',  0.85, 1.15), 0.50, 10.0).toFixed(2);
+  const success  = +clamp(p.success - (seed('succ') % 6) / 1000, 0.93, 1.0).toFixed(4);
+  const samples  = Math.round(p.samples * (0.7 + (seed('samp') / 100) * 0.4));
+
+  const overall = Math.round(0.4 * L1 + 0.4 * L3 + 0.2 * L2);
+  return {
+    L1, L2, L3,
+    overall, tier: tier(overall),
+    ttft, latency, p95, success, samples,
+    cost: mp, refIn, refOut, markup, drift,
+  };
+}
 function tier(overall) {
   if (overall >= 90) return 'AAA';
   if (overall >= 80) return 'AA';
@@ -1901,11 +1955,27 @@ const I18N = {
       notFound: 'Provider not found.',
       backToRanking: 'Ranking',
       openInRun: 'Use this provider',
+      // Model context bar
+      modelContextPre: 'Viewing {name} with',
+      modelContextLabel: 'Model',
+      modelContextSupports: '({n} models supported)',
+      // Top metrics
       m1MTokInOut: '1M tok (in/out)',
+      mObservedSub: 'Observed · {markup}% vs official',
+      mTrust: 'Trust (L1)',
+      mTrustSub: 'Model authenticity',
       mP50Latency: 'p50 latency',
       mP95: 'p95 {v}s',
       mSuccess: 'Success',
       mSamples: '{n} samples',
+      // Cost table — current model highlight chip
+      costCurrentChip: 'current',
+      // Incidents filter chips
+      incidentFilterAll: 'All ({n})',
+      incidentFilterCurrent: '{model} only ({n})',
+      noIncidentsForModel: 'No incidents affecting {model} in the recent window.',
+      // Performance section · model-aware summary
+      perfSummaryModel: '{model} on this provider · ~{samples} probes over past 7 days.',
       tagCost: '§01 · Cost',
       headObservedVsOfficial: 'Per-model price breakdown',
       noModelPricing: 'No per-model pricing data published for this router.',
@@ -2591,11 +2661,27 @@ const I18N = {
       notFound: '未找到该中转站。',
       backToRanking: '榜单',
       openInRun: '使用服务',
+      // Model context bar
+      modelContextPre: '查看 {name} 在',
+      modelContextLabel: '模型',
+      modelContextSupports: '下的表现 (共支持 {n} 个模型)',
+      // Top metrics
       m1MTokInOut: '1M tok (输入/输出)',
+      mObservedSub: '观测价 · 比官方价 {markup}%',
+      mTrust: '信任分 (L1)',
+      mTrustSub: '模型真实性',
       mP50Latency: 'p50 延迟',
       mP95: 'p95 {v}s',
       mSuccess: '成功率',
       mSamples: '{n} 次采样',
+      // Cost table — current model highlight chip
+      costCurrentChip: '当前',
+      // Incidents filter chips
+      incidentFilterAll: '全部 ({n})',
+      incidentFilterCurrent: '仅 {model} 相关 ({n})',
+      noIncidentsForModel: '近期窗口内无 {model} 相关事件。',
+      // Performance section · model-aware summary
+      perfSummaryModel: '{model} 在该中转站上的表现 · 基于过去 7 天约 {samples} 个探测样本。',
       tagCost: '§01 · 成本',
       headObservedVsOfficial: '各模型价格拆解',
       noModelPricing: '该中转站暂无公开的模型定价数据。',
@@ -3929,7 +4015,13 @@ function RunPage() {
     return ['portkey', 'openrouter', 'aimlapi'];
   }, []);
 
-  const [model, setModel] = useState('openai/gpt-5.5');
+  // Initial model also inherits from URL ?model= (e.g. when arriving from a
+  // provider detail page's CTA). Falls back to GPT-5.5 default.
+  const [model, setModel] = useState(() => {
+    const urlModel = route.params.model;
+    if (urlModel && MODELS.some(mm => mm.id === urlModel)) return urlModel;
+    return 'openai/gpt-5.5';
+  });
   const [activeProviders, setActiveProviders] = useState(initialActive);
   const [temperature, setTemperature] = useState(0);
   const [maxTokens, setMaxTokens] = useState(1024);
@@ -4964,9 +5056,20 @@ function providerCostEntries(p) {
 
 // Per-call cost estimator with model dropdown + at-scale linear projection.
 // Reads model selection from local state so user can switch within the card.
-function PerCallEstimator({ entries }) {
+function PerCallEstimator({ entries, initialSelectedId }) {
   const { t } = useLang();
-  const [selectedId, setSelectedId] = useState(entries[0]?.m.id);
+  // Initial selection follows the page-level model context if provided
+  const [selectedId, setSelectedId] = useState(
+    initialSelectedId && entries.some(e => e.m.id === initialSelectedId)
+      ? initialSelectedId
+      : entries[0]?.m.id
+  );
+  // Sync when the page-level model changes (user switches model in ModelContextBar)
+  useEffect(() => {
+    if (initialSelectedId && entries.some(e => e.m.id === initialSelectedId) && initialSelectedId !== selectedId) {
+      setSelectedId(initialSelectedId);
+    }
+  }, [initialSelectedId]); // eslint-disable-line react-hooks/exhaustive-deps
   const sel = entries.find(e => e.m.id === selectedId) || entries[0];
   if (!sel) return null;
 
@@ -5054,22 +5157,38 @@ function PerCallEstimator({ entries }) {
 
 // Top-of-detail-page metric strip · mirrors the ranking row columns
 // (cost / trust / latency / success) plus TTFT as a 5th tile.
-function TopMetrics({ p }) {
+// Top metrics — all 4 tiles are model-aware. Overall score has been moved to
+// the sidebar (with full "Provider × Model" context). Trust tile here is the
+// per-model L1 score so the user can see at a glance whether this combination
+// of provider+model is trustworthy.
+function TopMetrics({ p, m, model }) {
   const { t } = useLang();
-  const defaultModel = MODELS.find(m => m.id === p.defaultModelId);
-  // TTFT p95 derived deterministically from p.ttft (same formula as PerformanceSection)
-  const ttftP95Ms = ((p.ttft * (1.85 + (strHash(p.slug + 'p95ttft') % 25) / 100)) * 1000) | 0;
+  if (!m) return null;
+  const p95Ms = (m.p95 * 1000) | 0;
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-ink-600 mb-12">
       <Metric
         label={t('provider.m1MTokInOut')}
-        value={`${fmtUSD(p.costIn)} / ${fmtUSD(p.costOut)}`}
-        sub={defaultModel ? defaultModel.display : ''}
-        tone={p.costDelta < 0 ? 'brand' : p.costDelta > 10 ? 'coral' : 'bone'}
+        value={`${fmtUSD(m.cost.observedIn)} / ${fmtUSD(m.cost.observedOut)}`}
+        sub={t('provider.mObservedSub', { markup: (m.markup >= 0 ? '+' : '') + m.markup.toFixed(1) })}
+        tone={m.markup < -5 ? 'brand' : m.markup > 10 ? 'coral' : 'bone'}
       />
-      <TrustHistoryCard p={p}/>
-      <Metric label={t('provider.mTtft')} value={`${(p.ttft * 1000) | 0}ms`} sub={t('provider.mTtftSub', { ms: ttftP95Ms })}/>
-      <Metric label={t('provider.mSuccess')} value={fmtPct(p.success, 1)} sub={t('provider.mSamples', { n: p.samples.toLocaleString() })}/>
+      <Metric
+        label={t('provider.mTtft')}
+        value={`${(m.ttft * 1000) | 0}ms`}
+        sub={t('provider.mTtftSub', { ms: p95Ms })}
+      />
+      <Metric
+        label={t('provider.mSuccess')}
+        value={fmtPct(m.success, 1)}
+        sub={t('provider.mSamples', { n: m.samples.toLocaleString() })}
+      />
+      <Metric
+        label={t('provider.mTrust')}
+        value={m.L1}
+        sub={t('provider.mTrustSub')}
+        tone={m.L1 >= 88 ? 'brand' : m.L1 >= 75 ? 'bone' : 'amber'}
+      />
     </div>
   );
 }
@@ -5087,34 +5206,41 @@ function DimChipMini({ fam, count }) {
   );
 }
 
-// Sticky scorecard sidebar — page-level reading anchor with differentiated
-// styling (card-2 + brand gradient hairline + collapsible tier breakdowns).
-// On lg+ it sticks to the top; on mobile it's just an inline block.
-function ScoreSidebar({ p }) {
+// Sticky scorecard sidebar — page-level reading anchor for the SELECTED
+// model context. Title shows "{Provider} × {Model}" so the user always knows
+// what the score is FOR. Scores come from `m` (per-model derivation).
+function ScoreSidebar({ p, m, model }) {
   const { t } = useLang();
-  const dimCounts = (p.incidents || []).reduce((acc, inc) => {
+  if (!m) return null;
+  const modelDisplay = MODELS.find(x => x.id === model)?.display || model;
+  // Incidents filtered to those affecting the current model (sub-counts and total)
+  const relevantIncidents = (p.incidents || []).filter(inc => (inc.affectedModels || []).includes(model));
+  const dimCounts = relevantIncidents.reduce((acc, inc) => {
     const fam = (inc.dim || '').slice(0, 2);
     if (fam) acc[fam] = (acc[fam] || 0) + 1;
     return acc;
   }, {});
-  const totalEvents = Object.values(dimCounts).reduce((s, n) => s + n, 0);
+  const totalEvents = relevantIncidents.length;
 
+  // Sub-dimension scores stay platform-level (we don't have per-model sub-dim
+  // data). Tier-level scores come from m (model-aware). This is the honest
+  // mix: aggregate score is model-specific, internal weights are platform.
   const tiers = [
-    { key: 'L1', label: t('provider.l1Label'), score: p.L1, w: 40, text: 'text-brand', bar: 'bg-brand',
+    { key: 'L1', label: t('provider.l1Label'), score: m.L1, w: 40, text: 'text-brand', bar: 'bg-brand',
       subs: [
         { id: '1.1', name: t('provider.sub11'), value: p.scores.L1.modelAuth,    w: 50 },
         { id: '1.2', name: t('provider.sub12'), value: p.scores.L1.billingTrans, w: 30 },
         { id: '1.3', name: t('provider.sub13'), value: p.scores.L1.cacheFraud,   w: 20 },
       ],
     },
-    { key: 'L3', label: t('provider.l3Label'), score: p.L3, w: 40, text: 'text-amber', bar: 'bg-amber',
+    { key: 'L3', label: t('provider.l3Label'), score: m.L3, w: 40, text: 'text-amber', bar: 'bg-amber',
       subs: [
         { id: '3.1', name: t('provider.sub31'), value: p.scores.L3.listPricing,        w: 35 },
         { id: '3.2', name: t('provider.sub32'), value: p.scores.L3.relativeToOfficial, w: 40 },
         { id: '3.3', name: t('provider.sub33'), value: p.scores.L3.hiddenCost,         w: 25 },
       ],
     },
-    { key: 'L2', label: t('provider.l2Label'), score: p.L2, w: 20, text: 'text-sky', bar: 'bg-sky',
+    { key: 'L2', label: t('provider.l2Label'), score: m.L2, w: 20, text: 'text-sky', bar: 'bg-sky',
       subs: [
         { id: '2.1', name: t('provider.sub21'), value: p.scores.L2.latency,     w: 50 },
         { id: '2.2', name: t('provider.sub22'), value: p.scores.L2.throughput,  w: 30 },
@@ -5126,22 +5252,23 @@ function ScoreSidebar({ p }) {
   return (
     <aside className="lg:sticky lg:top-20 self-start">
       <div className="card-2 ring-1 ring-brand/25 relative overflow-hidden">
-        {/* Top brand gradient line */}
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-brand to-transparent"/>
         <div className="p-6">
-          {/* Headline score · single section: label, big number, / 100 and tier
-              chip all on one row, progress bar directly below */}
-          <div className="micro text-smoke mb-3">{t('provider.sidebarScoreLabel')}</div>
+          {/* Headline: "{Provider} × {Model}" so context is crystal clear */}
+          <div className="micro text-smoke mb-1">{t('provider.sidebarScoreLabel')}</div>
+          <div className="text-[11px] text-ash mb-3 truncate" title={`${p.name} × ${modelDisplay}`}>
+            <span className="text-bone">{p.name}</span> × <span className="text-bone">{modelDisplay}</span>
+          </div>
           <div className="flex items-baseline gap-3 flex-wrap">
-            <span className="serif text-[52px] leading-none tracking-editorial text-bone num">{p.overall}</span>
+            <span className="serif text-[52px] leading-none tracking-editorial text-bone num">{m.overall}</span>
             <span className="micro text-smoke num">/ 100</span>
-            <TierChip tier={p.tier} size="lg"/>
+            <TierChip tier={m.tier} size="lg"/>
           </div>
           <div className="mt-4 h-1.5 bg-ink-700 overflow-hidden relative">
             <div
               className="absolute inset-y-0 left-0 bg-brand transition-all"
-              style={{ width: `${p.overall}%` }}
-              title={`${p.overall} / 100`}
+              style={{ width: `${m.overall}%` }}
+              title={`${m.overall} / 100`}
             />
           </div>
 
@@ -5232,23 +5359,23 @@ function PlaceholderCard({ title, note }) {
   );
 }
 
-// PerformanceSection — §02 (L2) · NEW
-// Surfaces TTFT / p50 / p95 / p99 / success + 7d latency trend + regional
-// breakdown (mock) + throughput / long-context placeholders (T2 roadmap).
-function PerformanceSection({ p }) {
+// PerformanceSection — §02 (L2) · all metrics are model-aware. Uses `m` from
+// getModelMetrics() (per-model deterministic fake) instead of p's platform
+// aggregates, so when the user switches model in ModelContextBar the entire
+// section's numbers shift (slightly but visibly) to reflect that combination.
+function PerformanceSection({ p, m, model }) {
   const { t } = useLang();
-  // All latency metrics on this page are percentiles of TTFT (time-to-first-token).
-  // p50 = p.ttft directly; p95 / p99 derived from p50 with deterministic per-slug jitter.
-  const ttftP50 = p.ttft;
-  const ttftP95 = +(ttftP50 * (1.85 + (strHash(p.slug + 'p95ttft') % 25) / 100)).toFixed(3);
-  const ttftP99 = +(ttftP50 * (2.55 + (strHash(p.slug + 'p99ttft') % 30) / 100)).toFixed(3);
+  if (!m) return null;
+  const ttftP50 = m.ttft;
+  // p95 / p99 derived from p50 with model-specific deterministic jitter
+  const ttftP95 = +(ttftP50 * (1.85 + (strHash(p.slug + model + 'p95ttft') % 25) / 100)).toFixed(3);
+  const ttftP99 = +(ttftP50 * (2.55 + (strHash(p.slug + model + 'p99ttft') % 30) / 100)).toFixed(3);
   const fmtMs = (s) => `${(s * 1000) | 0}ms`;
+  const modelDisplay = MODELS.find(x => x.id === model)?.display || model;
 
-  // Regional TTFT mock — provider's home region keeps base TTFT,
-  // others scale up by a multiplier with deterministic jitter (network distance)
   const regions = useMemo(() => {
     const base = ttftP50;
-    const seed = (k) => strHash(p.slug + k) % 100;
+    const seed = (k) => strHash(p.slug + model + k) % 100;
     const reg = (p.region || '').toLowerCase();
     const homeBase = (homeKey) => reg.includes(homeKey) ? 1 : 1.4 + seed(homeKey) / 250;
     const globalish = reg.includes('global') || reg.includes('self') || reg.includes('asia');
@@ -5257,26 +5384,29 @@ function PerformanceSection({ p }) {
       { name: 'EU',   ttft: +(base * homeBase('eu')).toFixed(3) },
       { name: 'Asia', ttft: +(base * (globalish ? 1.1 : 1.7 + seed('asia') / 250)).toFixed(3) },
     ];
-  }, [p.slug, ttftP50, p.region]);
+  }, [p.slug, model, ttftP50, p.region]);
   const maxRegional = Math.max(...regions.map(r => r.ttft));
 
-  // 7d TTFT sparkline — derive from the last 7 of p.spark, anchored to p.ttft.
-  // We slice to exactly 7 so the label "7-day trend" matches the visible points.
+  // 7d TTFT trend — model-aware jitter applied to p.spark shape
   const ttftSpark = useMemo(() => {
     if (!p.spark || !p.spark.length) return [];
     const recent = p.spark.slice(-7);
-    return recent.map(v => +(ttftP50 * (0.88 + (v / 10) * 0.20)).toFixed(3));
-  }, [p.slug, p.spark, ttftP50]);
+    const seed = (k) => strHash(p.slug + model + k) % 100;
+    return recent.map((v, i) => +(ttftP50 * (0.88 + (v / 10) * 0.20) * (0.95 + (seed('d' + i) / 100) * 0.10)).toFixed(3));
+  }, [p.slug, model, p.spark, ttftP50]);
 
   const tone = (val, ok, warn) => val <= ok ? 'text-brand' : val <= warn ? 'text-amber' : 'text-coral';
-  const successTone = p.success >= 0.99 ? 'text-brand' : p.success >= 0.97 ? 'text-bone' : 'text-amber';
+  const successTone = m.success >= 0.99 ? 'text-brand' : m.success >= 0.97 ? 'text-bone' : 'text-amber';
 
   return (
     <section>
       <div className="micro text-smoke mb-3">{t('provider.tagPerformance')}</div>
-      <h3 className="serif text-3xl tracking-editorial">{t('provider.headPerformance')}</h3>
+      <h3 className="serif text-3xl tracking-editorial">
+        {t('provider.headPerformance')}
+        <span className="text-ash"> · {modelDisplay}</span>
+      </h3>
       <p className="mt-2 text-[13px] text-ash leading-relaxed">
-        {t('provider.perfSummary', { samples: p.samples.toLocaleString() })}
+        {t('provider.perfSummaryModel', { samples: m.samples.toLocaleString(), model: modelDisplay })}
       </p>
 
       {/* 4 TTFT percentile tiles (p50 / p95 / p99) + success rate */}
@@ -5284,7 +5414,7 @@ function PerformanceSection({ p }) {
         <PerfMetric label={t('provider.perfP50')}     hint={t('provider.perfP50Hint')}     value={fmtMs(ttftP50)}             tone={tone(ttftP50, 0.30, 0.50)}/>
         <PerfMetric label={t('provider.perfP95')}     hint={t('provider.perfP95Hint')}     value={fmtMs(ttftP95)}             tone={tone(ttftP95, 0.60, 1.00)}/>
         <PerfMetric label={t('provider.perfP99')}     hint={t('provider.perfP99Hint')}     value={fmtMs(ttftP99)}             tone={tone(ttftP99, 0.80, 1.40)}/>
-        <PerfMetric label={t('provider.perfSuccess')} hint={t('provider.perfSuccessHint')} value={fmtPct(p.success, 1)}       tone={successTone}/>
+        <PerfMetric label={t('provider.perfSuccess')} hint={t('provider.perfSuccessHint')} value={fmtPct(m.success, 1)}       tone={successTone}/>
       </div>
 
       {/* 7d TTFT trend · editorial-style smooth chart with header-driven hover */}
@@ -5325,16 +5455,50 @@ function PerformanceSection({ p }) {
   );
 }
 
-// IncidentsSection — bottom-of-page, full-width detail list
-function IncidentsSection({ p }) {
+// IncidentsSection — bottom-of-page, full-width detail list with a
+// "all / current model only" filter chip. Filter state is page-local
+// (not in URL) since it's a view toggle, not core page state.
+function IncidentsSection({ p, model }) {
   const { t } = useLang();
+  const [filter, setFilter] = useState('all'); // 'all' | 'current'
+  const modelDisplay = MODELS.find(m => m.id === model)?.display || model;
+  const currentMatches = (p.incidents || []).filter(inc => (inc.affectedModels || []).includes(model));
+  const displayed = filter === 'current' ? currentMatches : (p.incidents || []);
   return (
     <section className="mt-16">
-      <div className="micro text-smoke mb-3">{t('provider.tagIncidents')}</div>
+      <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
+        <div className="micro text-smoke">{t('provider.tagIncidents')}</div>
+        {(p.incidents || []).length > 0 && (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setFilter('all')}
+              className={cx(
+                'px-2.5 py-1 text-[11px] tracking-tight transition-colors border',
+                filter === 'all' ? 'border-brand text-brand bg-brand/5' : 'border-ink-600 text-ash hover:text-bone hover:border-bone/30'
+              )}
+            >
+              {t('provider.incidentFilterAll', { n: (p.incidents || []).length })}
+            </button>
+            <button
+              onClick={() => setFilter('current')}
+              className={cx(
+                'px-2.5 py-1 text-[11px] tracking-tight transition-colors border',
+                filter === 'current' ? 'border-brand text-brand bg-brand/5' : 'border-ink-600 text-ash hover:text-bone hover:border-bone/30'
+              )}
+            >
+              {t('provider.incidentFilterCurrent', { model: modelDisplay, n: currentMatches.length })}
+            </button>
+          </div>
+        )}
+      </div>
       <div className="card divide-y divide-ink-600">
-        {p.incidents.length === 0 ? (
-          <div className="px-6 py-8 text-ash text-[13px]">{t('provider.noIncidents')}</div>
-        ) : p.incidents.map((inc, i) => {
+        {displayed.length === 0 ? (
+          <div className="px-6 py-8 text-ash text-[13px]">
+            {filter === 'current'
+              ? t('provider.noIncidentsForModel', { model: modelDisplay })
+              : t('provider.noIncidents')}
+          </div>
+        ) : displayed.map((inc, i) => {
           const affectedNames = (inc.affectedModels || [])
             .map(mid => MODELS.find(m => m.id === mid)?.display)
             .filter(Boolean);
@@ -5366,8 +5530,11 @@ function IncidentsSection({ p }) {
   );
 }
 
-// CostSection — §01 (L3) · existing logic extracted into a component
-function CostSection({ p }) {
+// CostSection — §01 (L3) · accepts currentModel so the table can highlight that
+// row and the embedded cost analyzer can pre-select that model. The full per-
+// model table stays visible (per user decision) — current model just gets a
+// brand-tinted row + ring outline so it pops at a glance.
+function CostSection({ p, model: currentModel }) {
   const { t } = useLang();
   const entries = providerCostEntries(p);
   if (entries.length === 0) {
@@ -5426,31 +5593,54 @@ function CostSection({ p }) {
           </div>
         </div>
         <div className="hidden md:grid grid-cols-[1.4fr_1fr_1fr_1.3fr] gap-px bg-ink-600 text-[12.5px]">
-          {entries.map(({ m, mp, refIn, refOut }) => (
-            <Fragment key={m.id}>
-              <div className="bg-ink px-4 py-3">
-                <div className="text-bone">{m.display}</div>
-                <div className="micro text-smoke mt-0.5">{m.owner}</div>
-              </div>
-              <div className="bg-ink px-4 py-3 num text-smoke">{fmtUSD(refIn)} / {fmtUSD(refOut)}</div>
-              <div className="bg-ink px-4 py-3 num text-bone/70">{fmtUSD(mp.listedIn)} / {fmtUSD(mp.listedOut)}</div>
-              <div
-                className="px-4 py-3 num text-bone text-[15px] font-medium tracking-tight border-l-2 border-amber/50"
-                style={{ background: 'rgb(var(--amber) / 0.06)' }}
-              >
-                {fmtUSD(mp.observedIn)} / {fmtUSD(mp.observedOut)}
-              </div>
-            </Fragment>
-          ))}
+          {entries.map(({ m, mp, refIn, refOut }) => {
+            const isCurrent = m.id === currentModel;
+            // Highlight: brand-tinted bg on all 4 cells + left brand accent on first cell
+            const cellBg = isCurrent ? 'bg-brand/[0.06]' : 'bg-ink';
+            return (
+              <Fragment key={m.id}>
+                <div className={cx(cellBg, 'px-4 py-3 relative')}>
+                  {isCurrent && <span className="absolute inset-y-0 left-0 w-0.5 bg-brand"></span>}
+                  <div className="flex items-center gap-2">
+                    <span className="text-bone">{m.display}</span>
+                    {isCurrent && (
+                      <span className="text-[9px] tracking-wider uppercase text-brand border border-brand/40 px-1 py-px">
+                        {t('provider.costCurrentChip')}
+                      </span>
+                    )}
+                  </div>
+                  <div className="micro text-smoke mt-0.5">{m.owner}</div>
+                </div>
+                <div className={cx(cellBg, 'px-4 py-3 num text-smoke')}>{fmtUSD(refIn)} / {fmtUSD(refOut)}</div>
+                <div className={cx(cellBg, 'px-4 py-3 num text-bone/70')}>{fmtUSD(mp.listedIn)} / {fmtUSD(mp.listedOut)}</div>
+                <div
+                  className={cx('px-4 py-3 num text-bone text-[15px] font-medium tracking-tight border-l-2 border-amber/50',
+                    isCurrent ? 'bg-brand/[0.08]' : '')}
+                  style={isCurrent ? {} : { background: 'rgb(var(--amber) / 0.06)' }}
+                >
+                  {fmtUSD(mp.observedIn)} / {fmtUSD(mp.observedOut)}
+                </div>
+              </Fragment>
+            );
+          })}
         </div>
 
         {/* Mobile stacked cards */}
         <div className="md:hidden divide-y divide-ink-600">
-          {entries.map(({ m, mp, refIn, refOut }) => (
-            <div key={m.id} className="p-4">
-              <div className="mb-3">
-                <div className="text-bone text-[14px]">{m.display}</div>
-                <div className="micro text-smoke">{m.owner}</div>
+          {entries.map(({ m, mp, refIn, refOut }) => {
+            const isCurrent = m.id === currentModel;
+            return (
+            <div key={m.id} className={cx('p-4', isCurrent && 'bg-brand/[0.06] border-l-2 border-brand')}>
+              <div className="mb-3 flex items-center gap-2">
+                <div>
+                  <div className="text-bone text-[14px]">{m.display}</div>
+                  <div className="micro text-smoke">{m.owner}</div>
+                </div>
+                {isCurrent && (
+                  <span className="text-[9px] tracking-wider uppercase text-brand border border-brand/40 px-1 py-px">
+                    {t('provider.costCurrentChip')}
+                  </span>
+                )}
               </div>
               {/* Observed = primary, full-width, highlighted */}
               <div
@@ -5477,7 +5667,8 @@ function CostSection({ p }) {
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Table footer */}
@@ -5487,9 +5678,9 @@ function CostSection({ p }) {
         </div>
       </div>
 
-      {/* Per-call estimator */}
+      {/* Per-call estimator · initial selection follows page-level current model */}
       <div className="mt-8">
-        <PerCallEstimator entries={entries}/>
+        <PerCallEstimator entries={entries} initialSelectedId={currentModel}/>
       </div>
     </section>
   );
@@ -5497,9 +5688,44 @@ function CostSection({ p }) {
 
 function ProviderPage({ slug }) {
   const { t, lang } = useLang();
+  const { route } = useRouter();
   const p = PROVIDERS.find(x=>x.slug===slug);
   if (!p) return <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-32 text-center text-smoke">{t('provider.notFound')}</div>;
   const descText = typeof p.desc === 'string' ? p.desc : (p.desc?.[lang] || p.desc?.en || '');
+
+  // Model context — URL ?model= drives this state. If URL specifies a model that
+  // this provider supports, use it; otherwise fall back to first supported model.
+  const supportedIds = useMemo(() => Object.keys(p.modelPricing || {}), [p.slug]);
+  const [model, setModel] = useState(() => {
+    const urlModel = route.params.model;
+    if (urlModel && supportedIds.includes(urlModel)) return urlModel;
+    return supportedIds[0] || 'openai/gpt-5.5';
+  });
+  // Sync model when URL changes externally (e.g. back/forward)
+  useEffect(() => {
+    const urlModel = route.params.model;
+    if (urlModel && supportedIds.includes(urlModel) && urlModel !== model) {
+      setModel(urlModel);
+    } else if (urlModel && !supportedIds.includes(urlModel)) {
+      // URL points at an unsupported model — fix the URL silently
+      const fixed = supportedIds[0];
+      if (fixed) {
+        history.replaceState(null, '', `#/providers/${slug}?model=${encodeURIComponent(fixed)}`);
+        setModel(fixed);
+      }
+    }
+  }, [route.params.model, supportedIds.join('|')]);
+
+  const onModelChange = (newModel) => {
+    if (!supportedIds.includes(newModel) || newModel === model) return;
+    setModel(newModel);
+    // replaceState (not pushState) — model switching shouldn't pollute browser history
+    history.replaceState(null, '', `#/providers/${slug}?model=${encodeURIComponent(newModel)}`);
+  };
+
+  // Single source of truth for all model-aware metrics on the page
+  const m = useMemo(() => getModelMetrics(p, model), [p.slug, model]);
+  const modelDisplay = MODELS.find(x => x.id === model)?.display || model;
 
   const TitleRow = (
     <div className="flex items-center gap-4 mb-5">
@@ -5519,7 +5745,7 @@ function ProviderPage({ slug }) {
         <span>←</span> {t('provider.backToRanking')}
       </a>
 
-      <div className="border-b border-ink-600 pb-10 mb-12 flex items-end justify-between flex-wrap gap-6">
+      <div className="border-b border-ink-600 pb-10 mb-6 flex items-end justify-between flex-wrap gap-6">
         <div className="max-w-3xl">
           {p.website ? (
             <a
@@ -5537,26 +5763,59 @@ function ProviderPage({ slug }) {
           <p className="text-ash text-[15px] leading-relaxed">{descText}</p>
         </div>
         <div className="flex flex-col gap-2 items-end">
-          <a href={`#/run?provider=${slug}`} className="btn-brand px-5 py-2.5 text-sm font-medium inline-flex items-center gap-2">{t('provider.openInRun')} <I.arrow className="w-4 h-4"/></a>
+          <a
+            href={`#/run?providers=${slug}&model=${encodeURIComponent(model)}`}
+            className="btn-brand px-5 py-2.5 text-sm font-medium inline-flex items-center gap-2"
+          >
+            {t('provider.openInRun')} <I.arrow className="w-4 h-4"/>
+          </a>
         </div>
       </div>
 
-      {/* TOP METRICS — mirror of the ranking row */}
-      <TopMetrics p={p}/>
+      {/* MODEL CONTEXT BAR — drives all per-model data below */}
+      <ModelContextBar p={p} model={model} onChange={onModelChange} supportedIds={supportedIds}/>
 
-      {/* MAIN GRID — left: cost / performance / fingerprint;
-          right: sticky scorecard (inline on mobile) */}
+      {/* TOP METRICS — all model-aware */}
+      <TopMetrics p={p} m={m} model={model}/>
+
+      {/* MAIN GRID */}
       <div className="grid lg:grid-cols-3 gap-10 lg:gap-12">
         <div className="lg:col-span-2 space-y-16">
-          <CostSection p={p}/>
-          <PerformanceSection p={p}/>
-          <FingerprintPanel p={p}/>
+          <CostSection p={p} model={model}/>
+          <PerformanceSection p={p} m={m} model={model}/>
+          <FingerprintPanel p={p} model={model}/>
         </div>
-        <ScoreSidebar p={p}/>
+        <ScoreSidebar p={p} m={m} model={model}/>
       </div>
 
       {/* INCIDENTS — full-width bottom section */}
-      <IncidentsSection p={p}/>
+      <IncidentsSection p={p} model={model}/>
+    </div>
+  );
+}
+
+// Model selector below Hero — drives all per-model data on the page.
+// Permanent-visible (not sticky); changing it updates URL ?model= and
+// re-derives all section data via the page's `m` (getModelMetrics result).
+function ModelContextBar({ p, model, onChange, supportedIds }) {
+  const { t } = useLang();
+  return (
+    <div className="mb-12 flex items-center gap-3 flex-wrap text-[13px]">
+      <span className="text-ash">
+        {t('provider.modelContextPre', { name: p.name })}
+      </span>
+      <Dropdown
+        label={t('provider.modelContextLabel')}
+        value={MODELS.find(m => m.id === model)?.display || model}
+        options={supportedIds.map(id => ({
+          v: id,
+          l: MODELS.find(mm => mm.id === id)?.display || id,
+        }))}
+        onChange={onChange}
+      />
+      <span className="text-[12px] text-smoke">
+        {t('provider.modelContextSupports', { n: supportedIds.length })}
+      </span>
     </div>
   );
 }
@@ -5595,9 +5854,16 @@ const VELOCITY_NOTES = {
   },
 };
 
-function FingerprintPanel({ p }) {
+function FingerprintPanel({ p, model: pageModel }) {
   const { t } = useLang();
-  const [activeModel, setActiveModel] = useState(MODELS[0].id);
+  // Initial tab follows page-level model context (so the user sees the fingerprint
+  // for THIS provider × model combination first). Tab can still be switched
+  // independently to inspect a different model's fingerprint without leaving the page.
+  const [activeModel, setActiveModel] = useState(pageModel || MODELS[0].id);
+  // Keep tab in sync when page-level model changes
+  useEffect(() => {
+    if (pageModel && pageModel !== activeModel) setActiveModel(pageModel);
+  }, [pageModel]); // eslint-disable-line react-hooks/exhaustive-deps
   const m = MODELS.find(x => x.id === activeModel);
   const fp = fingerprint(p.slug, activeModel);
 
