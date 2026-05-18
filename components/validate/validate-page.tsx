@@ -1,14 +1,216 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLang } from "@/lib/contexts/lang";
 import { useData } from "@/lib/contexts/data";
-import { fingerprint, inferProvider, syntheticFingerprint } from "@/lib/fingerprint";
 import { strHash, cx } from "@/lib/utils";
 import { I } from "@/components/ui/icons";
-import { ProviderMark } from "@/components/ui/provider-mark";
 import type { FingerprintResult } from "@/lib/types";
+
+interface StaticModel {
+  id: string;
+  display: string;
+  family: string;
+  owner: string;
+}
+
+interface StaticProvider {
+  slug: string;
+  name: string;
+  type: string;
+  domain: string | null;
+  region: string;
+  trust: number;
+  samples: number;
+}
+
+const STATIC_MODELS: StaticModel[] = [
+  { id: "openai/gpt-5.5", display: "GPT-5.5", family: "GPT", owner: "OpenAI" },
+  { id: "anthropic/claude-4.6-sonnet", display: "Claude 4.6 Sonnet", family: "Claude", owner: "Anthropic" },
+  { id: "google/gemini-3.1-pro", display: "Gemini 3.1 Pro", family: "Gemini", owner: "Google" },
+  { id: "deepseek/deepseek-v3.2", display: "DeepSeek V3.2", family: "DeepSeek", owner: "DeepSeek" },
+  { id: "meta/llama-4-maverick", display: "Llama 4 Maverick", family: "Llama", owner: "Meta" },
+  { id: "mistral/mistral-large-2.1", display: "Mistral Large 2.1", family: "Mistral", owner: "Mistral" },
+];
+
+const STATIC_PROVIDERS: StaticProvider[] = [
+  { slug: "portkey", name: "Portkey", type: "gateway", domain: "portkey.ai", region: "Global", trust: 91, samples: 2418 },
+  { slug: "openrouter", name: "OpenRouter", type: "router", domain: "openrouter.ai", region: "US/EU", trust: 77, samples: 5102 },
+  { slug: "bai", name: "B.ai", type: "router", domain: "b.ai", region: "Global", trust: 71, samples: 1834 },
+  { slug: "together", name: "Together AI", type: "inference", domain: "together.ai", region: "US", trust: 89, samples: 4012 },
+  { slug: "fireworks", name: "Fireworks AI", type: "inference", domain: "fireworks.ai", region: "US", trust: 87, samples: 3502 },
+  { slug: "anyscale", name: "Anyscale", type: "inference", domain: "anyscale.com", region: "US/EU", trust: 79, samples: 1422 },
+  { slug: "replicate", name: "Replicate", type: "inference", domain: "replicate.com", region: "Global", trust: 76, samples: 928 },
+  { slug: "litellm", name: "LiteLLM", type: "self_host", domain: null, region: "Self-hosted", trust: 91, samples: 612 },
+  { slug: "easyrouter", name: "EasyRouter", type: "router", domain: "easyrouter.io", region: "Global", trust: 83, samples: 2860 },
+];
+
+const FINGERPRINT_OVERRIDES: Record<string, Partial<FingerprintResult>> = {
+  "openrouter:anthropic/claude-4.6-sonnet": {
+    embedDist: 0.78,
+    lengthKsP: 0.18,
+    refusalDelta: 7,
+    tokenizer: { observed: "cl100k_base", expected: "claude", match: false },
+    flag: {
+      kind: "silent_fallback",
+      headline: "Silent fallback suspected",
+      detail: "Tokenizer signature does not match Anthropic's expected tokenizer on 18% of sampled responses. Last seen 2h ago.",
+    },
+  },
+  "bai:openai/gpt-5.5": {
+    precision: "Q8",
+    flag: {
+      kind: "quantization",
+      headline: "Quantization detected",
+      detail: "Numeric precision tasks show ~6.3% accuracy delta vs. canonical FP16 baseline.",
+    },
+  },
+  "replicate:meta/llama-4-maverick": {
+    precision: "Q4",
+    embedDist: 0.81,
+    flag: {
+      kind: "quantization",
+      headline: "Aggressive quantization",
+      detail: "Q4 weights detected via output entropy fingerprint. Cost is lower but reasoning benchmarks underperform by ~9 points.",
+    },
+  },
+};
+
+function tokenizerFor(model: StaticModel) {
+  if (model.owner === "OpenAI") return "cl100k_base";
+  if (model.owner === "Anthropic") return "claude";
+  if (model.owner === "Google") return "gemini";
+  return "sentencepiece";
+}
+
+function inferProvider(rawUrl: string): string | null {
+  if (!rawUrl) return null;
+  let host = "";
+  try {
+    const u = new URL(rawUrl.match(/^https?:/) ? rawUrl : "https://" + rawUrl);
+    host = u.hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+  const stripped = host.replace(/^(api|www|inference|router|gateway)\./, "");
+  for (const p of STATIC_PROVIDERS) {
+    if (!p.domain) continue;
+    if (host === p.domain || host.endsWith("." + p.domain) || stripped === p.domain) {
+      return p.slug;
+    }
+  }
+  return null;
+}
+
+function fingerprint(slug: string, modelId: string, modelCatalog: StaticModel[]): FingerprintResult | null {
+  const p = STATIC_PROVIDERS.find((x) => x.slug === slug);
+  const m = modelCatalog.find((x) => x.id === modelId);
+  if (!p || !m) return null;
+
+  const closed = ["OpenAI", "Anthropic", "Google"].includes(m.owner);
+  if (closed && p.type === "inference") {
+    return {
+      unsupported: true,
+      reason: `${p.name} is a direct-inference provider for open-weight models. Requests for ${m.owner} models would not be routed honestly.`,
+    } as FingerprintResult;
+  }
+
+  const key = `${slug}:${modelId}`;
+  const ov = FINGERPRINT_OVERRIDES[key] || {};
+  const seed = strHash(key);
+  const base = p.trust / 100;
+  const embedDist = ov.embedDist ?? Math.min(0.99, Math.max(0.45, base + ((seed % 200) - 100) / 4000 + 0.02));
+  const lengthKsP = ov.lengthKsP ?? Math.min(0.95, Math.max(0.04, 0.4 + (p.trust - 80) / 120 + ((seed % 100) - 50) / 600));
+  const expected = tokenizerFor(m);
+  const tokenizer = ov.tokenizer ?? { observed: expected, expected, match: true };
+  const precision = ov.precision ?? "FP16";
+  const refusalDelta = ov.refusalDelta ?? Math.round(((seed % 14) - 7) * (1 - p.trust / 110));
+  const samples = Math.max(48, Math.round(p.samples / (modelCatalog.length * 2) + (seed % 80)));
+  const score = Math.round(
+    Math.max(0, embedDist * 50) +
+      lengthKsP * 20 +
+      (tokenizer.match ? 15 : 4) +
+      (precision === "FP16" ? 10 : precision === "Q8" ? 6 : 3) +
+      Math.max(0, 5 - Math.abs(refusalDelta) * 0.5),
+  );
+
+  return { embedDist, lengthKsP, tokenizer, precision, refusalDelta, samples, score, flag: ov.flag ?? null };
+}
+
+function syntheticFingerprint(url: string, modelId: string, modelCatalog: StaticModel[]): FingerprintResult | null {
+  const m = modelCatalog.find((x) => x.id === modelId);
+  if (!m) return null;
+  const seed = strHash(url + ":" + modelId);
+  const baseTier = 60 + (seed % 30);
+  const embedDist = Math.min(0.97, Math.max(0.55, baseTier / 100 + ((seed % 200) - 100) / 5000));
+  const lengthKsP = Math.min(0.92, Math.max(0.05, 0.3 + (baseTier - 70) / 150 + ((seed % 100) - 50) / 700));
+  const expected = tokenizerFor(m);
+  const tokMatch = seed % 100 > 12;
+  const tokenizer = { observed: tokMatch ? expected : "cl100k_base", expected, match: tokMatch };
+  const precision: FingerprintResult["precision"] = seed % 100 > 30 ? "FP16" : seed % 100 > 8 ? "Q8" : "Q4";
+  const refusalDelta = Math.round(((seed % 18) - 9) * 0.7);
+  const samples = 40 + (seed % 30);
+  const score = Math.round(
+    Math.max(0, embedDist * 50) +
+      lengthKsP * 20 +
+      (tokenizer.match ? 15 : 4) +
+      (precision === "FP16" ? 10 : precision === "Q8" ? 6 : 3) +
+      Math.max(0, 5 - Math.abs(refusalDelta) * 0.5),
+  );
+  const flag =
+    !tokenizer.match
+      ? {
+          kind: "tokenizer_mismatch",
+          headline: "Tokenizer mismatch",
+          detail: `Observed tokenizer (${tokenizer.observed}) does not match the expected ${tokenizer.expected} signature for ${m.display}.`,
+        }
+      : precision === "Q4"
+        ? {
+            kind: "quantization",
+            headline: "Aggressive quantization (Q4)",
+            detail: "Q4 weights detected via numeric task accuracy delta. Cost is lower; reasoning benchmarks underperform vs FP16.",
+          }
+        : precision === "Q8"
+          ? {
+              kind: "quantization",
+              headline: "Quantization detected (Q8)",
+              detail: "~6% accuracy delta on numeric tasks vs canonical FP16 baseline.",
+            }
+          : null;
+  return { firstSeen: true, embedDist, lengthKsP, tokenizer, precision, refusalDelta, samples, score, flag };
+}
+
+function StaticProviderMark({ slug, size = 36 }: { slug: string; size?: number }) {
+  const p = STATIC_PROVIDERS.find((x) => x.slug === slug);
+  const [failed, setFailed] = useState(false);
+  const label = p?.name || slug;
+
+  if (p?.domain && !failed) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return (
+      <img
+        src={`https://logo.clearbit.com/${p.domain}`}
+        alt={label}
+        width={size}
+        height={size}
+        loading="lazy"
+        onError={() => setFailed(true)}
+        className="shrink-0 rounded-sm bg-white object-contain"
+        style={{ width: size, height: size, padding: Math.max(2, size * 0.06) }}
+      />
+    );
+  }
+
+  return (
+    <div
+      className="flex items-center justify-center serif shrink-0 bg-ink-700 text-bone"
+      style={{ width: size, height: size, fontSize: size * 0.5 }}
+    >
+      {label[0]?.toUpperCase() ?? "?"}
+    </div>
+  );
+}
 
 const VALIDATE_SAMPLES = [
   { label: "Portkey", url: "https://api.portkey.ai/v1/chat/completions" },
@@ -41,7 +243,7 @@ interface Report {
 
 export function ValidatePageBody() {
   const { t } = useLang();
-  const { providers, models } = useData();
+  const { models } = useData();
   const [url, setUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [showKey, setShowKey] = useState(false);
@@ -50,6 +252,12 @@ export function ValidatePageBody() {
   const [phaseStatus, setPhaseStatus] = useState<Record<string, PhaseStatus>>({});
   const [report, setReport] = useState<Report | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const compareModels = models.length > 0 ? models : STATIC_MODELS;
+
+  useEffect(() => {
+    if (compareModels.some((x) => x.id === model)) return;
+    setModel(compareModels[0]?.id ?? "openai/gpt-5.5");
+  }, [compareModels, model]);
 
   const start = () => {
     if (!url.trim()) {
@@ -93,10 +301,10 @@ export function ValidatePageBody() {
     timers.push(
       setTimeout(() => {
         const slug = inferProvider(url);
-        const fp = slug ? fingerprint(slug, model) : syntheticFingerprint(url, model);
+        const fp = slug ? fingerprint(slug, model, compareModels) : syntheticFingerprint(url, model, compareModels);
         let provider: Report["provider"];
         if (slug) {
-          const p = providers.find((x) => x.slug === slug)!;
+          const p = STATIC_PROVIDERS.find((x) => x.slug === slug)!;
           provider = { name: p.name, type: p.type, region: p.region };
         } else {
           let host = "";
@@ -119,7 +327,7 @@ export function ValidatePageBody() {
     setPhaseStatus({});
   };
 
-  const m = models.find((x) => x.id === model);
+  const m = compareModels.find((x) => x.id === model);
   if (!m) return null;
 
   return (
@@ -246,7 +454,7 @@ export function ValidatePageBody() {
               disabled={phase === "running"}
               className="w-full bg-ink-800 border border-ink-500 px-3 py-2.5 text-[13px] text-bone min-w-[200px]"
             >
-              {models.map((mm) => (
+              {compareModels.map((mm) => (
                 <option key={mm.id} value={mm.id}>
                   {mm.display}
                 </option>
@@ -450,7 +658,7 @@ function ValidateReport({ report }: { report: Report }) {
               {slug ? t("validate.indexedRouter") : t("validate.firstSeen")}
             </div>
             <div className="flex items-center gap-3 mt-2">
-              {slug && <ProviderMark slug={slug} />}
+              {slug && <StaticProviderMark slug={slug} />}
               <div>
                 <div className="text-[15px] text-bone">{provider.name}</div>
                 <div className="micro text-smoke">

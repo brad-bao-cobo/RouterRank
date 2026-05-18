@@ -48,8 +48,9 @@ _FUNCS: dict[tuple[str, str], object] = {
 }
 
 class StreamTestRequest(BaseModel):
-    prompt:      str   = Field(..., min_length=1, max_length=8000)
-    temperature: float = Field(default=0.0, ge=0.0, le=2.0)
+    prompt:        str   = Field(..., min_length=1, max_length=8000)
+    system_prompt: str   = Field(default="", max_length=4000)
+    temperature:   float = Field(default=0.0, ge=0.0, le=2.0)
     models: list[str] = Field(
         default_factory=lambda: list(_DEFAULT_SLUGS),
         description="Model slugs, e.g. ['gpt-5.4-mini']",
@@ -58,6 +59,7 @@ class StreamTestRequest(BaseModel):
         default=_ALL_PROVIDERS,
         description="Providers: OpenAI / Anthropic / Google / OpenRouter / EasyRouter / B.ai",
     )
+    max_tokens: int = Field(default=1024, ge=1, le=16384)
 
     def resolved_models(self) -> list[ModelSpec]:
         return [MODEL_REGISTRY[slug] for slug in self.models if slug in MODEL_REGISTRY]
@@ -79,7 +81,7 @@ async def stream_test_result(req: StreamTestRequest):
                 yield f"data: {json.dumps({'__start__': True, 'provider': provider, 'model': model.display_name, 'model_id': model.model_id})}\n\n"
 
                 try:
-                    result = await func(model.model_id, req.prompt, req.temperature)
+                    result = await func(model.model_id, req.prompt, req.temperature, req.system_prompt, req.max_tokens)
                     payload = result.model_dump()
                     payload["provider"] = provider
                     payload["model"] = model.display_name

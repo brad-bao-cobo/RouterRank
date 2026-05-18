@@ -32,8 +32,8 @@ class Settings(BaseSettings):
     # THIRD_PARTY_UNSUPPORTED in llm_caller.py — no config change needed.
 
     class Config:
-        # 用 ENV_FILE=.env.test 环境变量切换配置文件
         env_file = os.getenv("ENV_FILE", "../.env"), ".env"
+        extra = "ignore"
 
 
 settings = Settings()

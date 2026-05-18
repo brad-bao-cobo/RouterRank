@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useLang } from "@/lib/contexts/lang";
 import { useData } from "@/lib/contexts/data";
 import { fingerprint, trustHistory } from "@/lib/fingerprint";
@@ -21,12 +21,20 @@ import { Sparkline } from "@/components/ui/sparkline";
 import { TierChip } from "@/components/ui/tier-chip";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Dropdown } from "@/components/ui/dropdown";
-import type { FingerprintResult, ModelDef, ModelPricingEntry, Provider } from "@/lib/types";
+import type { FingerprintResult, ModelDef, ModelPricingEntry, Provider, Tier } from "@/lib/types";
 
 export function ProviderDetail({ slug }: { slug: string }) {
   const { t, lang } = useLang();
   const { providers, models, loading } = useData();
   const p = providers.find((x) => x.slug === slug);
+
+  const supportedModels = useMemo(
+    () => models.filter((m) => p?.modelPricing?.[m.id] || p?.modelEvals?.[m.id]),
+    [models, p],
+  );
+  const [selectedModelId, setSelectedModelId] = useState<string>("");
+  const effectiveModelId = selectedModelId || p?.defaultModelId || supportedModels[0]?.id || "";
+  const selectedModel = models.find((m) => m.id === effectiveModelId) ?? supportedModels[0] ?? null;
 
   if (loading) {
     return (
@@ -96,17 +104,20 @@ export function ProviderDetail({ slug }: { slug: string }) {
         </div>
       </div>
 
+      {/* MODEL CONTEXT BAR */}
+      <ModelContextBar p={p} model={selectedModel} models={models} onChange={setSelectedModelId} />
+
       {/* TOP METRICS */}
-      <TopMetrics p={p} />
+      <TopMetrics p={p} modelId={effectiveModelId} model={selectedModel} />
 
       {/* MAIN GRID */}
       <div className="grid lg:grid-cols-3 gap-10 lg:gap-12">
         <div className="lg:col-span-2 space-y-16">
-          <CostSection p={p} />
+          <CostSection p={p} selectedModelId={effectiveModelId} />
           <PerformanceSection p={p} />
-          <FingerprintPanel p={p} />
+          <FingerprintPanel p={p} modelId={effectiveModelId} onModelChange={setSelectedModelId} />
         </div>
-        <ScoreSidebar p={p} />
+        <ScoreSidebar p={p} modelId={effectiveModelId} model={selectedModel} />
       </div>
 
       {/* INCIDENTS */}
@@ -115,33 +126,83 @@ export function ProviderDetail({ slug }: { slug: string }) {
   );
 }
 
+/* ─── Model context bar ─── */
+
+function ModelContextBar({
+  p, model, models, onChange,
+}: {
+  p: Provider;
+  model: ModelDef | null;
+  models: ModelDef[];
+  onChange: (id: string) => void;
+}) {
+  const { t } = useLang();
+  const supported = models.filter((m) => p.modelPricing?.[m.id] || p.modelEvals?.[m.id]);
+  if (supported.length === 0 || !model) return null;
+  return (
+    <div className="mb-10 flex items-center gap-3 flex-wrap border border-ink-600 px-5 py-3 bg-ink-800/40">
+      <span className="micro text-smoke shrink-0">{t("provider.modelContextLabel")}</span>
+      <Dropdown
+        label={t("provider.selectModel")}
+        value={model.display}
+        options={supported.map((m) => ({ v: m.id, l: m.display }))}
+        onChange={onChange}
+      />
+      <span className="text-[12px] text-ash">
+        {t("provider.modelContextSupported", { n: supported.length })}
+      </span>
+    </div>
+  );
+}
+
 /* ─── Top metrics bar ─── */
 
-function TopMetrics({ p }: { p: Provider }) {
+function TopMetrics({ p, modelId, model }: { p: Provider; modelId: string; model: ModelDef | null }) {
   const { t } = useLang();
-  const { models } = useData();
-  const defaultModel = models.find((m) => m.id === p.defaultModelId);
-  const costDeltaTone =
-    p.costDelta < 0 ? "brand" : p.costDelta > 10 ? "coral" : "bone";
-  const ttftP95ms = Math.round(p.ttftP95 * 1000);
+
+  const mp = p.modelPricing?.[modelId];
+  const ev = p.modelEvals?.[modelId];
+
+  // Cost: use model's listed price with delta vs official
+  const costIn = mp?.listedIn ?? p.costIn;
+  const costOut = mp?.listedOut ?? p.costOut;
+  const officialIn = model?.officialIn ?? 0;
+  const officialOut = model?.officialOut ?? 0;
+  const avgListed = (costIn + costOut) / 2;
+  const avgRef = (officialIn + officialOut) / 2;
+  const costDelta = avgRef > 0 ? ((avgListed - avgRef) / avgRef) * 100 : 0;
+  const costDeltaTone = costDelta < 0 ? "brand" : costDelta > 5 ? "coral" : "bone";
+
+  // TTFT from model eval
+  const ttftP50ms = ev?.ttftP50Ms ?? Math.round(p.ttft * 1000);
+  const ttftP95ms = ev?.ttftP95Ms ?? Math.round(p.ttftP95 * 1000);
+
+  // Success from model eval
+  const success = ev?.successRate ?? p.success;
+
+  // Overall score from model eval
+  const modelScore = ev?.totalScore ?? p.overall;
+  const modelTier = ev?.rating ?? p.tier;
+  const modelScoreTone = modelScore >= 80 ? "brand" : modelScore >= 65 ? "amber" : "coral";
+
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-ink-600 mb-12">
       <Metric
         label={t("provider.m1MTokInOut")}
-        value={`${fmtUSD(p.costIn)} / ${fmtUSD(p.costOut)}`}
-        sub={defaultModel?.display}
+        value={`${fmtUSD(costIn)} / ${fmtUSD(costOut)}`}
+        sub={`${costDelta >= 0 ? "+" : ""}${costDelta.toFixed(1)}% vs official`}
         tone={costDeltaTone}
       />
       <TrustHistoryCard p={p} />
       <Metric
         label={t("provider.mTtft")}
-        value={`${Math.round(p.ttft * 1000)}ms`}
+        value={`${ttftP50ms}ms`}
         sub={t("provider.mTtftSub", { ms: String(ttftP95ms) })}
       />
       <Metric
         label={t("provider.mSuccess")}
-        value={fmtPct(p.success, 1)}
-        sub={t("provider.mSamples", { n: p.samples.toLocaleString() })}
+        value={fmtPct(success, 1)}
+        sub={t("provider.mSamples", { n: (ev?.e2eP50Ms ? Math.round(ev.e2eP50Ms) : p.samples).toLocaleString() })}
       />
     </div>
   );
@@ -201,9 +262,16 @@ function BillingTrustChip({ status }: { status: "clean" | "minor" | "concern" })
   );
 }
 
-function PerCallEstimator({ entries }: { entries: CostEntry[] }) {
+function PerCallEstimator({ entries, initialModelId }: { entries: CostEntry[]; initialModelId: string }) {
   const { t } = useLang();
-  const [selectedId, setSelectedId] = useState(entries[0]?.m.id ?? "");
+  const [selectedId, setSelectedId] = useState(initialModelId || (entries[0]?.m.id ?? ""));
+
+  useEffect(() => {
+    if (initialModelId && entries.some((e) => e.m.id === initialModelId)) {
+      setSelectedId(initialModelId);
+    }
+  }, [initialModelId, entries]);
+
   const sel = entries.find((e) => e.m.id === selectedId) || entries[0];
   if (!sel) return null;
 
@@ -287,7 +355,7 @@ function PerCallEstimator({ entries }: { entries: CostEntry[] }) {
   );
 }
 
-function CostSection({ p }: { p: Provider }) {
+function CostSection({ p, selectedModelId }: { p: Provider; selectedModelId: string }) {
   const { t } = useLang();
   const entries = useCostEntries(p);
 
@@ -347,60 +415,73 @@ function CostSection({ p }: { p: Provider }) {
           </div>
         </div>
         <div className="hidden md:grid grid-cols-[1.4fr_1fr_1fr_1.3fr] gap-px bg-ink-600 text-[12.5px]">
-          {entries.map(({ m, mp, refIn, refOut }) => (
-            <Fragment key={m.id}>
-              <div className="bg-ink px-4 py-3">
-                <div className="text-bone">{m.display}</div>
-                <div className="micro text-smoke mt-0.5">{m.owner}</div>
-              </div>
-              <div className="bg-ink px-4 py-3 num text-smoke">
-                {fmtUSD(refIn)} / {fmtUSD(refOut)}
-              </div>
-              <div className="bg-ink px-4 py-3 num text-bone/70">
-                {fmtUSD(mp.listedIn)} / {fmtUSD(mp.listedOut)}
-              </div>
-              <div
-                className="px-4 py-3 num text-bone text-[15px] font-medium tracking-tight border-l-2 border-amber/50"
-                style={{ background: "rgb(var(--amber) / 0.06)" }}
-              >
-                {fmtUSD(mp.observedIn)} / {fmtUSD(mp.observedOut)}
-              </div>
-            </Fragment>
-          ))}
+          {entries.map(({ m, mp, refIn, refOut }) => {
+            const isSelected = m.id === selectedModelId;
+            return (
+              <Fragment key={m.id}>
+                <div
+                  className={cx("bg-ink px-4 py-3", isSelected && "border-l-2 border-brand/60")}
+                  style={isSelected ? { background: "rgb(var(--brand) / 0.04)" } : undefined}
+                >
+                  <div className="text-bone">{m.display}</div>
+                  <div className="micro text-smoke mt-0.5">{m.owner}</div>
+                </div>
+                <div className="bg-ink px-4 py-3 num text-smoke">
+                  {fmtUSD(refIn)} / {fmtUSD(refOut)}
+                </div>
+                <div className="bg-ink px-4 py-3 num text-bone/70">
+                  {fmtUSD(mp.listedIn)} / {fmtUSD(mp.listedOut)}
+                </div>
+                <div
+                  className="px-4 py-3 num text-bone text-[15px] font-medium tracking-tight border-l-2 border-amber/50"
+                  style={{ background: "rgb(var(--amber) / 0.06)" }}
+                >
+                  {fmtUSD(mp.observedIn)} / {fmtUSD(mp.observedOut)}
+                </div>
+              </Fragment>
+            );
+          })}
         </div>
 
         {/* Mobile stacked cards */}
         <div className="md:hidden divide-y divide-ink-600">
-          {entries.map(({ m, mp, refIn, refOut }) => (
-            <div key={m.id} className="p-4">
-              <div className="mb-3">
-                <div className="text-bone text-[14px]">{m.display}</div>
-                <div className="micro text-smoke">{m.owner}</div>
-              </div>
+          {entries.map(({ m, mp, refIn, refOut }) => {
+            const isSelected = m.id === selectedModelId;
+            return (
               <div
-                className="px-3 py-2.5 border-l-2 border-amber/50 mb-2"
-                style={{ background: "rgb(var(--amber) / 0.08)" }}
+                key={m.id}
+                className={cx("p-4", isSelected && "border-l-2 border-brand/60")}
+                style={isSelected ? { background: "rgb(var(--brand) / 0.04)" } : undefined}
               >
-                <div className="micro text-amber mb-1 flex items-center gap-1.5">
-                  <span>{t("provider.colObservedShort")}</span>
-                  <PreviewChip />
+                <div className="mb-3">
+                  <div className="text-bone text-[14px]">{m.display}</div>
+                  <div className="micro text-smoke">{m.owner}</div>
                 </div>
-                <div className="num text-bone text-[15px] font-medium tracking-tight">
-                  {fmtUSD(mp.observedIn)} / {fmtUSD(mp.observedOut)}
+                <div
+                  className="px-3 py-2.5 border-l-2 border-amber/50 mb-2"
+                  style={{ background: "rgb(var(--amber) / 0.08)" }}
+                >
+                  <div className="micro text-amber mb-1 flex items-center gap-1.5">
+                    <span>{t("provider.colObservedShort")}</span>
+                    <PreviewChip />
+                  </div>
+                  <div className="num text-bone text-[15px] font-medium tracking-tight">
+                    {fmtUSD(mp.observedIn)} / {fmtUSD(mp.observedOut)}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-[11px]">
+                  <div>
+                    <div className="micro text-smoke">{t("provider.colOfficialShort")}</div>
+                    <div className="num text-smoke">{fmtUSD(refIn)} / {fmtUSD(refOut)}</div>
+                  </div>
+                  <div>
+                    <div className="micro text-smoke">{t("provider.colListedShort")}</div>
+                    <div className="num text-bone/70">{fmtUSD(mp.listedIn)} / {fmtUSD(mp.listedOut)}</div>
+                  </div>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2 text-[11px]">
-                <div>
-                  <div className="micro text-smoke">{t("provider.colOfficialShort")}</div>
-                  <div className="num text-smoke">{fmtUSD(refIn)} / {fmtUSD(refOut)}</div>
-                </div>
-                <div>
-                  <div className="micro text-smoke">{t("provider.colListedShort")}</div>
-                  <div className="num text-bone/70">{fmtUSD(mp.listedIn)} / {fmtUSD(mp.listedOut)}</div>
-                </div>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="px-4 py-3 micro text-smoke flex items-center gap-2 border-t border-ink-600 flex-wrap">
@@ -410,7 +491,7 @@ function CostSection({ p }: { p: Provider }) {
       </div>
 
       <div className="mt-8">
-        <PerCallEstimator entries={entries} />
+        <PerCallEstimator entries={entries} initialModelId={selectedModelId} />
       </div>
     </section>
   );
@@ -651,8 +732,12 @@ function PerfMetric({ label, value, tone, hint }: { label: string; value: string
 
 /* ─── Score sidebar ─── */
 
-function ScoreSidebar({ p }: { p: Provider }) {
+function ScoreSidebar({ p, modelId, model }: { p: Provider; modelId: string; model: ModelDef | null }) {
   const { t } = useLang();
+
+  const ev = p.modelEvals?.[modelId];
+  const score = ev?.totalScore ?? p.overall;
+  const modelTier = (ev?.rating ?? p.tier) as Tier;
 
   const groups = [
     {
@@ -706,17 +791,22 @@ function ScoreSidebar({ p }: { p: Provider }) {
         {/* Top brand gradient line — absolute inside relative overflow-hidden */}
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-brand to-transparent" />
         <div className="p-6">
-          <div className="micro text-smoke mb-3">{t("provider.sidebarScoreLabel")}</div>
+          <div className="micro text-smoke mb-1">{t("provider.sidebarScoreLabel")}</div>
+          {model && (
+            <div className="text-[11px] text-ash mb-3">
+              {p.name} <span className="text-smoke">×</span> {model.display}
+            </div>
+          )}
           <div className="flex items-baseline gap-3 flex-wrap">
-            <span className="serif text-[52px] leading-none tracking-editorial text-bone num">{p.overall}</span>
+            <span className="serif text-[52px] leading-none tracking-editorial text-bone num">{score}</span>
             <span className="micro text-smoke num">/ 100</span>
-            <TierChip tier={p.tier} size="lg" />
+            <TierChip tier={modelTier} size="lg" />
           </div>
           <div className="mt-4 h-1.5 bg-ink-700 overflow-hidden relative">
             <div
               className="absolute inset-y-0 left-0 bg-brand transition-all"
-              style={{ width: `${p.overall}%` }}
-              title={`${p.overall} / 100`}
+              style={{ width: `${score}%` }}
+              title={`${score} / 100`}
             />
           </div>
 
@@ -860,14 +950,12 @@ function IncidentsSection({ p }: { p: Provider }) {
 
 /* ─── Fingerprint panel ─── */
 
-function FingerprintPanel({ p }: { p: Provider }) {
+function FingerprintPanel({ p, modelId, onModelChange }: { p: Provider; modelId: string; onModelChange: (id: string) => void }) {
   const { t } = useLang();
   const { models } = useData();
-  const [activeModel, setActiveModel] = useState("");
-  const effectiveModel = activeModel || models[0]?.id || "";
-  const m = models.find((x) => x.id === effectiveModel);
+  const m = models.find((x) => x.id === modelId);
   if (!m) return null;
-  const fp = fingerprint(p.slug, effectiveModel);
+  const fp = fingerprint(p.slug, modelId);
 
   return (
     <div className="mt-16">
@@ -892,7 +980,7 @@ function FingerprintPanel({ p }: { p: Provider }) {
 
       <div className="flex md:flex-wrap gap-0 border-b border-ink-600 mb-6 -mx-1 overflow-x-auto md:overflow-visible no-scroll-x">
         {models.map((model) => {
-          const active = model.id === effectiveModel;
+          const active = model.id === modelId;
           const modelFp = fingerprint(p.slug, model.id);
           const tone =
             !modelFp || modelFp.unsupported
@@ -907,7 +995,7 @@ function FingerprintPanel({ p }: { p: Provider }) {
           return (
             <button
               key={model.id}
-              onClick={() => setActiveModel(model.id)}
+              onClick={() => onModelChange(model.id)}
               className={cx(
                 "px-4 py-2.5 text-[12px] tracking-tight transition-colors border-b-2 -mb-px flex items-center gap-1.5",
                 active ? "border-brand text-bone" : cx("border-transparent hover:text-bone", tone),

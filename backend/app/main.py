@@ -1,4 +1,6 @@
 import os
+import truststore
+truststore.inject_into_ssl()
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import pricing, stream_test, test_run, model_evaluation, providers

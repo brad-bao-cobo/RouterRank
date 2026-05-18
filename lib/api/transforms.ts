@@ -38,29 +38,25 @@ function effective(price: number | null, discount: number): number | null {
 // ── deterministic derivations from top-level scores ──────────────────────────
 
 function deriveSubScores(
-  slug: string,
   L1: number,
   L2: number,
   L3: number,
 ): SubScores {
-  const h = (key: string, range = 10) =>
-    (strHash(slug + key) % range) - Math.floor(range / 2);
-
   return {
     L1: {
-      modelAuth:    clamp(L1 + h("ma")),
-      billingTrans: clamp(L1 + h("bt")),
-      cacheFraud:   clamp(L1 + h("cf") - 3),
+      modelAuth:    L1,
+      billingTrans: L1,
+      cacheFraud:   L1,
     },
     L2: {
-      latency:     clamp(L2 + h("la")),
-      throughput:  clamp(L2 + h("tp")),
-      longContext: clamp(L2 + h("lc") - 4),
+      latency:     L2,
+      throughput:  L2,
+      longContext: L2,
     },
     L3: {
-      listPricing:        clamp(L3 + h("lp")),
-      relativeToOfficial: clamp(L3 + h("ro")),
-      hiddenCost:         clamp(L3 + h("hc") + 2),
+      listPricing:        L3,
+      relativeToOfficial: L3,
+      hiddenCost:         L3,
     },
   };
 }
@@ -237,7 +233,7 @@ export function buildProviders(
     }
 
     // ── derived fields ────────────────────────────────────────────────────────
-    const scores     = deriveSubScores(spec.slug, L1, L2, L3);
+    const scores     = deriveSubScores(L1, L2, L3);
     const trustParts = deriveTrustParts(spec.slug, L1);
     const spark      = deriveSpark(spec.slug, ttftSec);
 

@@ -38,9 +38,9 @@
     --smoke: 130 130 140;
     --brand: 31 50 214;
     --brand-deep: 13 28 156;
-    --amber: 161 110 38;
+    --amber: 184 92 18;
     --coral: 178 53 53;
-    --sky: 30 84 200;
+    --sky: 14 122 140;
     --hover-overlay: 10 10 11 / 0.04;
     --noise-blend: multiply;
     --noise-opacity: 0.18;
@@ -50,6 +50,10 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+  }
+
+  html {
+    overflow-y: scroll;
   }
 
   html,
@@ -347,4 +351,53 @@
     box-shadow: 0 0 0 3px rgb(var(--ink)), 0 0 0 6px rgb(var(--brand) / 0.25);
   }
   .range-brand:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .md-body { font-size: 12.5px; line-height: 1.55; color: rgb(var(--bone)); }
+  .md-body p { margin: 0.45em 0; }
+  .md-body p:first-child { margin-top: 0; }
+  .md-body p:last-child { margin-bottom: 0; }
+  .md-body h1, .md-body h2, .md-body h3, .md-body h4 {
+    font-family: "Instrument Serif", serif;
+    letter-spacing: -0.02em;
+    color: rgb(var(--bone));
+    margin: 0.85em 0 0.35em;
+    font-weight: 400;
+  }
+  .md-body h1 { font-size: 1.55em; }
+  .md-body h2 { font-size: 1.35em; }
+  .md-body h3 { font-size: 1.18em; }
+  .md-body h4 { font-size: 1.05em; }
+  .md-body ul, .md-body ol { margin: 0.45em 0; padding-left: 1.5em; }
+  .md-body li { margin: 0.18em 0; }
+  .md-body strong { color: rgb(var(--bone)); font-weight: 600; }
+  .md-body em { font-style: italic; color: rgb(var(--ash)); }
+  .md-body a { color: rgb(var(--brand)); text-decoration: underline; text-underline-offset: 2px; }
+  .md-body a:hover { opacity: 0.85; }
+  .md-body code {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.88em;
+    padding: 0.08em 0.35em;
+    background: rgb(var(--ink-700));
+    border: 1px solid rgb(var(--ink-600));
+  }
+  .md-body pre {
+    background: rgb(var(--ink-700));
+    border: 1px solid rgb(var(--ink-600));
+    padding: 0.75em 1em;
+    overflow-x: auto;
+    margin: 0.6em 0;
+    font-size: 11.5px;
+    line-height: 1.5;
+  }
+  .md-body pre code { background: transparent; border: none; padding: 0; font-size: inherit; color: rgb(var(--bone)); }
+  .md-body blockquote {
+    border-left: 2px solid rgb(var(--brand));
+    padding-left: 1em;
+    color: rgb(var(--ash));
+    margin: 0.6em 0;
+  }
+  .md-body hr { border: 0; border-top: 1px solid rgb(var(--ink-600)); margin: 1em 0; }
+  .md-body table { border-collapse: collapse; margin: 0.6em 0; font-size: 12px; }
+  .md-body th, .md-body td { padding: 0.35em 0.65em; border: 1px solid rgb(var(--ink-600)); }
+  .md-body th { background: rgb(var(--ink-700)); }
 }

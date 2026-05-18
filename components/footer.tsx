@@ -7,7 +7,7 @@ import { cx } from "@/lib/utils";
 function Logo({ className = "" }: { className?: string }) {
   const { t } = useLang();
   return (
-    <div className={cx("flex items-center gap-2 group", className)}>
+    <Link href="/" className={cx("flex items-center gap-2 group", className)}>
       <div className="relative">
         <svg viewBox="0 0 32 32" className="w-7 h-7">
           <rect x="2" y="2" width="28" height="28" stroke="currentColor" strokeWidth="1" fill="none" />
@@ -25,7 +25,7 @@ function Logo({ className = "" }: { className?: string }) {
         <div className="serif text-[22px] tracking-editorial">RouterRank</div>
         <div className="micro text-smoke mt-0.5">{t("header.tagline")}</div>
       </div>
-    </div>
+    </Link>
   );
 }
 

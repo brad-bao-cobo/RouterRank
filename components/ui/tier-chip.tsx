@@ -1,12 +1,12 @@
 import type { Tier } from "@/lib/types";
 import { cx } from "@/lib/utils";
 
-const TONE: Record<Tier, string> = {
-  AAA: "border-brand text-brand",
-  AA: "border-brand text-brand",
-  A: "border-amber text-amber",
-  B: "border-coral text-coral",
-  C: "border-coral text-coral",
+const CLS: Record<Tier, string> = {
+  AAA: "bg-brand text-ink",
+  AA:  "border border-brand text-brand",
+  A:   "border border-amber text-amber",
+  B:   "border border-coral text-coral",
+  C:   "bg-coral text-bone",
 };
 
 export function TierChip({
@@ -19,12 +19,11 @@ export function TierChip({
   return (
     <span
       className={cx(
-        "inline-flex items-center gap-1 border tracking-wider font-medium",
-        TONE[tier],
+        "inline-flex items-center num font-semibold tracking-wider",
+        CLS[tier],
         size === "lg" ? "px-2 py-0.5 text-[11px]" : "px-1.5 py-0.5 text-[10px]",
       )}
     >
-      <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
       {tier}
     </span>
   );

@@ -37,13 +37,18 @@ def _tpot(ttft_ms: Optional[float], e2e_ms: float, output_tokens: Optional[int])
 
 # ── Official providers ────────────────────────────────────────────────────────
 
-async def call_openai_gpt(model_id: str, prompt: str, temperature: float) -> LLMResult:
+async def call_openai_gpt(model_id: str, prompt: str, temperature: float, system_prompt: str = "", max_tokens: int = 1024) -> LLMResult:
     client = AsyncOpenAI(api_key=settings.openai_api_key)
     t0 = time.perf_counter()
+    messages = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+    messages.append({"role": "user", "content": prompt})
     stream = await client.chat.completions.create(
         model=model_id,
-        messages=[{"role": "user", "content": prompt}],
+        messages=messages,
         temperature=temperature,
+        max_tokens=max_tokens,
         stream=True,
         stream_options={"include_usage": True},
         logprobs=True,
@@ -85,14 +90,17 @@ async def call_openai_gpt(model_id: str, prompt: str, temperature: float) -> LLM
     )
 
 
-async def call_anthropic_claude(model_id: str, prompt: str, temperature: float) -> LLMResult:
+async def call_anthropic_claude(model_id: str, prompt: str, temperature: float, system_prompt: str = "", max_tokens: int = 1024) -> LLMResult:
     client = AsyncAnthropic(api_key=settings.anthropic_api_key)
     t0 = time.perf_counter()
-    stream = await client.messages.create(
-        model=model_id, max_tokens=4096,
+    create_kwargs: dict = dict(
+        model=model_id, max_tokens=max_tokens,
         messages=[{"role": "user", "content": prompt}],
         temperature=temperature, stream=True,
     )
+    if system_prompt:
+        create_kwargs["system"] = system_prompt
+    stream = await client.messages.create(**create_kwargs)
     chunks: list[str] = []
     first_token: Optional[str] = None
     ttft_ms: Optional[float] = None
@@ -125,7 +133,7 @@ async def call_anthropic_claude(model_id: str, prompt: str, temperature: float) 
     )
 
 
-async def call_google_gemini(model_id: str, prompt: str, temperature: float) -> LLMResult:
+async def call_google_gemini(model_id: str, prompt: str, temperature: float, system_prompt: str = "", max_tokens: int = 1024) -> LLMResult:
     url = (
         f"https://generativelanguage.googleapis.com/v1beta/models/"
         f"{model_id}:streamGenerateContent"
@@ -138,14 +146,18 @@ async def call_google_gemini(model_id: str, prompt: str, temperature: float) -> 
 
     stop_reason: Optional[str] = None
 
+    gemini_body: dict = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": temperature, "maxOutputTokens": max_tokens},
+    }
+    if system_prompt:
+        gemini_body["systemInstruction"] = {"parts": [{"text": system_prompt}]}
+
     async with httpx.AsyncClient(timeout=60, verify=False) as http:
         async with http.stream(
             "POST", url,
             params={"key": settings.google_api_key, "alt": "sse"},
-            json={
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {"temperature": temperature},
-            },
+            json=gemini_body,
         ) as r:
             r.raise_for_status()
             async for line in r.aiter_lines():
@@ -193,7 +205,7 @@ _OPENROUTER_HEADERS = {
 }
 
 
-async def _call_openrouter(model_id: str, prompt: str, temperature: float) -> LLMResult:
+async def _call_openrouter(model_id: str, prompt: str, temperature: float, system_prompt: str = "", max_tokens: int = 1024) -> LLMResult:
     t0 = time.perf_counter()
     chunks: list[str] = []
     first_token: Optional[str] = None
@@ -202,6 +214,11 @@ async def _call_openrouter(model_id: str, prompt: str, temperature: float) -> LL
     prompt_tokens = output_tokens = None
     stop_reason: Optional[str] = None
 
+    messages = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+    messages.append({"role": "user", "content": prompt})
+
     async with httpx.AsyncClient(timeout=60, verify=False) as http:
         async with http.stream(
             "POST",
@@ -209,8 +226,9 @@ async def _call_openrouter(model_id: str, prompt: str, temperature: float) -> LL
             headers=_OPENROUTER_HEADERS,
             json={
                 "model": model_id,
-                "messages": [{"role": "user", "content": prompt}],
+                "messages": messages,
                 "temperature": temperature,
+                "max_tokens": max_tokens,
                 "stream": True,
                 "logprobs": True,
             },
@@ -253,19 +271,19 @@ async def _call_openrouter(model_id: str, prompt: str, temperature: float) -> LL
     )
 
 
-async def call_openrouter_gpt(model_id: str, prompt: str, temperature: float) -> LLMResult:
-    return await _call_openrouter(f"openai/{model_id}", prompt, temperature)
+async def call_openrouter_gpt(model_id: str, prompt: str, temperature: float, system_prompt: str = "", max_tokens: int = 1024) -> LLMResult:
+    return await _call_openrouter(f"openai/{model_id}", prompt, temperature, system_prompt, max_tokens)
 
-async def call_openrouter_claude(model_id: str, prompt: str, temperature: float) -> LLMResult:
-    return await _call_openrouter(f"anthropic/{model_id}", prompt, temperature)
+async def call_openrouter_claude(model_id: str, prompt: str, temperature: float, system_prompt: str = "", max_tokens: int = 1024) -> LLMResult:
+    return await _call_openrouter(f"anthropic/{model_id}", prompt, temperature, system_prompt, max_tokens)
 
-async def call_openrouter_gemini(model_id: str, prompt: str, temperature: float) -> LLMResult:
-    return await _call_openrouter(f"google/{model_id}", prompt, temperature)
+async def call_openrouter_gemini(model_id: str, prompt: str, temperature: float, system_prompt: str = "", max_tokens: int = 1024) -> LLMResult:
+    return await _call_openrouter(f"google/{model_id}", prompt, temperature, system_prompt, max_tokens)
 
 
 # ── EasyRouter ────────────────────────────────────────────────────────────────
 
-async def call_easyrouter_gpt(model_id: str, prompt: str, temperature: float) -> LLMResult:
+async def call_easyrouter_gpt(model_id: str, prompt: str, temperature: float, system_prompt: str = "", max_tokens: int = 1024) -> LLMResult:
     t0 = time.perf_counter()
     chunks: list[str] = []
     first_token: Optional[str] = None
@@ -273,12 +291,16 @@ async def call_easyrouter_gpt(model_id: str, prompt: str, temperature: float) ->
     prompt_tokens = output_tokens = None
     stop_reason: Optional[str] = None
 
+    input_field: object = prompt
+    if system_prompt:
+        input_field = [{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}]
+
     async with httpx.AsyncClient(timeout=60, verify=False) as http:
         async with http.stream(
             "POST",
             f"{settings.easyrouter_base_url.rstrip('/')}/responses",
             headers={"Authorization": f"Bearer {settings.easyrouter_api_key}", "Content-Type": "application/json"},
-            json={"model": model_id, "input": prompt, "temperature": temperature, "stream": True},
+            json={"model": model_id, "input": input_field, "temperature": temperature, "max_output_tokens": max_tokens, "stream": True},
         ) as r:
             r.raise_for_status()
             async for line in r.aiter_lines():
@@ -313,13 +335,21 @@ async def call_easyrouter_gpt(model_id: str, prompt: str, temperature: float) ->
     )
 
 
-async def call_easyrouter_claude(model_id: str, prompt: str, temperature: float) -> LLMResult:
+async def call_easyrouter_claude(model_id: str, prompt: str, temperature: float, system_prompt: str = "", max_tokens: int = 1024) -> LLMResult:
     t0 = time.perf_counter()
     chunks: list[str] = []
     first_token: Optional[str] = None
     ttft_ms: Optional[float] = None
     prompt_tokens = output_tokens = None
     stop_reason: Optional[str] = None
+
+    er_claude_body: dict = {
+        "model": model_id, "max_tokens": max_tokens,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": temperature, "stream": True,
+    }
+    if system_prompt:
+        er_claude_body["system"] = system_prompt
 
     async with httpx.AsyncClient(timeout=60, verify=False) as http:
         async with http.stream(
@@ -330,11 +360,7 @@ async def call_easyrouter_claude(model_id: str, prompt: str, temperature: float)
                 "Content-Type": "application/json",
                 "anthropic-version": "2023-06-01",
             },
-            json={
-                "model": model_id, "max_tokens": 4096,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": temperature, "stream": True,
-            },
+            json=er_claude_body,
         ) as r:
             r.raise_for_status()
             async for line in r.aiter_lines():
@@ -373,20 +399,24 @@ _EASYROUTER_GEMINI_ID: dict[str, str] = {
 }
 
 
-async def call_easyrouter_gemini(model_id: str, prompt: str, temperature: float) -> LLMResult:
+async def call_easyrouter_gemini(model_id: str, prompt: str, temperature: float, system_prompt: str = "", max_tokens: int = 1024) -> LLMResult:
     er_model_id = _EASYROUTER_GEMINI_ID.get(model_id, model_id)
     parsed = urlparse(settings.easyrouter_base_url)
     url = f"{parsed.scheme}://{parsed.netloc}/v1beta/models/{er_model_id}:generateContent"
     t0 = time.perf_counter()
 
+    er_gemini_body: dict = {
+        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": temperature, "maxOutputTokens": max_tokens},
+    }
+    if system_prompt:
+        er_gemini_body["systemInstruction"] = {"parts": [{"text": system_prompt}]}
+
     async with httpx.AsyncClient(timeout=60, verify=False) as http:
         r = await http.post(
             url,
             headers={"Authorization": f"Bearer {settings.easyrouter_api_key}", "Content-Type": "application/json"},
-            json={
-                "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-                "generationConfig": {"temperature": temperature},
-            },
+            json=er_gemini_body,
         )
         r.raise_for_status()
         data = r.json()
@@ -414,7 +444,7 @@ async def call_easyrouter_gemini(model_id: str, prompt: str, temperature: float)
 
 # ── B.ai ──────────────────────────────────────────────────────────────────────
 
-async def _call_bai(model_id: str, prompt: str, temperature: float) -> LLMResult:
+async def _call_bai(model_id: str, prompt: str, temperature: float, system_prompt: str = "", max_tokens: int = 1024) -> LLMResult:
     t0 = time.perf_counter()
     chunks: list[str] = []
     first_token: Optional[str] = None
@@ -423,6 +453,11 @@ async def _call_bai(model_id: str, prompt: str, temperature: float) -> LLMResult
     prompt_tokens = output_tokens = None
     stop_reason: Optional[str] = None
 
+    messages = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+    messages.append({"role": "user", "content": prompt})
+
     async with httpx.AsyncClient(timeout=60, verify=False) as http:
         async with http.stream(
             "POST",
@@ -430,8 +465,9 @@ async def _call_bai(model_id: str, prompt: str, temperature: float) -> LLMResult
             headers={"Authorization": f"Bearer {settings.bai_api_key}", "Content-Type": "application/json"},
             json={
                 "model": model_id,
-                "messages": [{"role": "user", "content": prompt}],
+                "messages": messages,
                 "temperature": temperature,
+                "max_tokens": max_tokens,
                 "stream": True,
                 "logprobs": True,
             },
@@ -474,16 +510,16 @@ async def _call_bai(model_id: str, prompt: str, temperature: float) -> LLMResult
     )
 
 
-async def call_bai_gpt(model_id: str, prompt: str, temperature: float) -> LLMResult:
-    return await _call_bai(model_id, prompt, temperature)
+async def call_bai_gpt(model_id: str, prompt: str, temperature: float, system_prompt: str = "", max_tokens: int = 1024) -> LLMResult:
+    return await _call_bai(model_id, prompt, temperature, system_prompt, max_tokens)
 
-async def call_bai_claude(model_id: str, prompt: str, temperature: float) -> LLMResult:
-    return await _call_bai(model_id, prompt, temperature)
+async def call_bai_claude(model_id: str, prompt: str, temperature: float, system_prompt: str = "", max_tokens: int = 1024) -> LLMResult:
+    return await _call_bai(model_id, prompt, temperature, system_prompt, max_tokens)
 
 
 # ── EdenAI ────────────────────────────────────────────────────────────────────
 
-async def _call_edenai(model_id: str, prompt: str, temperature: float) -> LLMResult:
+async def _call_edenai(model_id: str, prompt: str, temperature: float, system_prompt: str = "", max_tokens: int = 1024) -> LLMResult:
     """OpenAI-compatible SSE call to EdenAI. model_id must already include the
     provider prefix, e.g. 'openai/gpt-5.4-mini'."""
     t0 = time.perf_counter()
@@ -493,6 +529,11 @@ async def _call_edenai(model_id: str, prompt: str, temperature: float) -> LLMRes
     ttft_ms: Optional[float] = None
     prompt_tokens = output_tokens = None
     stop_reason: Optional[str] = None
+
+    messages = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+    messages.append({"role": "user", "content": prompt})
 
     async with httpx.AsyncClient(timeout=60, verify=False) as http:
         async with http.stream(
@@ -504,8 +545,9 @@ async def _call_edenai(model_id: str, prompt: str, temperature: float) -> LLMRes
             },
             json={
                 "model": model_id,
-                "messages": [{"role": "user", "content": prompt}],
+                "messages": messages,
                 "temperature": temperature,
+                "max_tokens": max_tokens,
                 "stream": True,
             },
         ) as r:
@@ -542,11 +584,11 @@ async def _call_edenai(model_id: str, prompt: str, temperature: float) -> LLMRes
     )
 
 
-async def call_edenai_gpt(model_id: str, prompt: str, temperature: float) -> LLMResult:
-    return await _call_edenai(f"openai/{model_id}", prompt, temperature)
+async def call_edenai_gpt(model_id: str, prompt: str, temperature: float, system_prompt: str = "", max_tokens: int = 1024) -> LLMResult:
+    return await _call_edenai(f"openai/{model_id}", prompt, temperature, system_prompt, max_tokens)
 
-async def call_edenai_claude(model_id: str, prompt: str, temperature: float) -> LLMResult:
-    return await _call_edenai(f"anthropic/{model_id}", prompt, temperature)
+async def call_edenai_claude(model_id: str, prompt: str, temperature: float, system_prompt: str = "", max_tokens: int = 1024) -> LLMResult:
+    return await _call_edenai(f"anthropic/{model_id}", prompt, temperature, system_prompt, max_tokens)
 
-async def call_edenai_gemini(model_id: str, prompt: str, temperature: float) -> LLMResult:
-    return await _call_edenai(f"google/{model_id}", prompt, temperature)
+async def call_edenai_gemini(model_id: str, prompt: str, temperature: float, system_prompt: str = "", max_tokens: int = 1024) -> LLMResult:
+    return await _call_edenai(f"google/{model_id}", prompt, temperature, system_prompt, max_tokens)

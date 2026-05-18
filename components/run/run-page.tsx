@@ -1,34 +1,100 @@
 "use client";
 
-import Link from "next/link";
+import { Fragment, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useLang } from "@/lib/contexts/lang";
 import { useToast } from "@/lib/contexts/toast";
-import { useWallet } from "@/lib/contexts/wallet";
-import { BENCHMARK_TEMPLATES, detectBenchmark, getMockResponse, PROVIDER_STYLE } from "@/lib/benchmarks";
+import { BENCHMARK_TEMPLATES } from "@/lib/benchmarks";
 import { useData } from "@/lib/contexts/data";
-import { tokenCost } from "@/lib/scoring";
 import { useStreamingText } from "@/lib/use-streaming-text";
-import { copyToClipboard, cx, fmtPct, fmtUSD, strHash, trustLabel, trustTone } from "@/lib/utils";
+import { copyToClipboard, cx, fmtUSD } from "@/lib/utils";
 import { I } from "@/components/ui/icons";
 import { ModelDropdown } from "@/components/ui/model-dropdown";
 import { ProviderMark } from "@/components/ui/provider-mark";
 import { RangeInput } from "@/components/ui/range-input";
-import { TierChip } from "@/components/ui/tier-chip";
 import { TrustBadge } from "@/components/ui/trust-badge";
-import { PaymentModal } from "@/components/wallet/payment-modal";
-import type { BenchmarkKind, Provider, RunState, RunStatusRow, Tier } from "@/lib/types";
+import { Modal } from "@/components/ui/modal";
+import type { SVGProps } from "react";
 
-interface HistoryEntry {
-  id: string;
-  prompt: string;
-  mode: "single" | "compare";
-  modelDisplay: string;
-  providerSlugs: string[];
-  providers: RunStatusRow[];
-  timestamp: number;
+// ─── inline SVG icons not in the shared I object ────────────────────────────
+
+type IconProps = SVGProps<SVGSVGElement>;
+
+function IconSend(p: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" {...p}>
+      <path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z" />
+    </svg>
+  );
 }
+
+function IconThumbUp(p: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" {...p}>
+      <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z" />
+      <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
+    </svg>
+  );
+}
+
+function IconThumbDown(p: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" {...p}>
+      <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z" />
+      <path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" />
+    </svg>
+  );
+}
+
+function IconSliders(p: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" {...p}>
+      <line x1="4" y1="21" x2="4" y2="14" />
+      <line x1="4" y1="10" x2="4" y2="3" />
+      <line x1="12" y1="21" x2="12" y2="12" />
+      <line x1="12" y1="8" x2="12" y2="3" />
+      <line x1="20" y1="21" x2="20" y2="16" />
+      <line x1="20" y1="12" x2="20" y2="3" />
+      <line x1="1" y1="14" x2="7" y2="14" />
+      <line x1="9" y1="8" x2="15" y2="8" />
+      <line x1="17" y1="16" x2="23" y2="16" />
+    </svg>
+  );
+}
+
+// ─── message types ───────────────────────────────────────────────────────────
+
+interface Response {
+  slug: string;
+  status: "pending" | "running" | "completed" | "failed" | "cancelled";
+  thumb: "up" | "down" | null;
+  latency?: number;
+  ttft?: number;
+  cost?: number | null;
+  inputTokens?: number;
+  outputTokens?: number;
+  content?: string | null;
+  error?: string | null;
+}
+
+interface UserMessage {
+  id: string;
+  role: "user";
+  ts: number;
+  content: string;
+}
+
+interface AssistantMessage {
+  id: string;
+  role: "assistant";
+  ts: number;
+  turnId: string;
+  responses: Response[];
+}
+
+type Message = UserMessage | AssistantMessage;
+
+// ─── public export ────────────────────────────────────────────────────────────
 
 export function RunPageBody() {
   return (
@@ -38,361 +104,576 @@ export function RunPageBody() {
   );
 }
 
+// ─── main inner component ─────────────────────────────────────────────────────
+
 function RunPageInner() {
   const { t } = useLang();
   const { providers, models } = useData();
   const toast = useToast();
-  const { wallet, setShowConnect } = useWallet();
   const params = useSearchParams();
 
-  const initialSelected = useMemo(() => {
+  // URL-supplied overrides (computed once at mount)
+  const urlProviders = useMemo(() => {
     const single = params.get("provider");
     const multi = (params.get("providers") || "").split(",").filter(Boolean);
     if (single) return [single];
-    if (multi.length >= 2) return multi.slice(0, 5);
-    if (multi.length === 1) return multi;
-    return ["portkey", "openrouter", "bai", "together"];
+    return multi.slice(0, 5);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const [promptMode, setPromptMode] = useState<"single" | "system_user">("single");
-  const [systemPrompt, setSystemPrompt] = useState(
-    "You are a precise technical writer. Be concrete and avoid filler.",
-  );
-  const [prompt, setPrompt] = useState(
-    "Explain account abstraction in simple terms. Cover ERC-4337, paymasters, and trade-offs.",
-  );
-  const [model, setModel] = useState("openai/gpt-5.5");
-  const [selected, setSelected] = useState<string[]>(initialSelected);
+  const [model, setModel] = useState<string>(() => params.get("model") || "");
+  const [activeProviders, setActiveProviders] = useState<string[]>(urlProviders);
   const [temperature, setTemperature] = useState(0);
   const [maxTokens, setMaxTokens] = useState(1024);
-  const [fallback, setFallback] = useState(false);
-  const [run, setRun] = useState<RunState | null>(null);
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
-  const [payTarget, setPayTarget] = useState<{ provider: Provider; cost: number } | null>(null);
-  const promptRef = useRef<HTMLTextAreaElement | null>(null);
+  const [systemPrompt, setSystemPrompt] = useState("");
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [compose, setCompose] = useState("");
+  const [showParams, setShowParams] = useState(false);
+  const [showPickerModal, setShowPickerModal] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+  const composeRef = useRef<HTMLTextAreaElement | null>(null);
+  const threadBottomRef = useRef<HTMLDivElement | null>(null);
+  const latestUserAnchorRef = useRef<HTMLDivElement | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const defaultsInitialized = useRef(false);
 
-  const fullPrompt =
-    promptMode === "system_user" ? `${systemPrompt}\n\n${prompt}` : prompt;
-
-  const estimatedCost = useMemo(() => {
-    if (selected.length < 1) return 0;
-    const inToks = Math.max(40, Math.round(fullPrompt.length / 4));
-    const expectedOut = Math.min(maxTokens, 800);
-    return selected.reduce((acc, slug) => {
-      const p = providers.find((x) => x.slug === slug);
-      if (!p) return acc;
-      return acc + tokenCost(p, inToks, expectedOut);
-    }, 0);
-  }, [selected, fullPrompt, maxTokens, providers]);
-
-  const allDone = run && run.providers.every((r) => r.status === "completed" || r.status === "failed");
-  const completed = run?.providers.filter((r) => r.status === "completed") ?? [];
-
-  const buildScores = (rows: RunStatusRow[]): RunStatusRow[] =>
-    rows.map((r) => {
-      if (r.status !== "completed") return r;
-      const p = providers.find((x) => x.slug === r.slug)!;
-      return {
-        ...r,
-        scores: { L1: p.L1, L2: p.L2, L3: p.L3, overall: p.overall, tier: p.tier },
-      };
-    });
-
-  const start = () => {
-    if (selected.length < 1 || !prompt) return;
-    const id = "run_" + Math.random().toString(36).slice(2, 9);
-    const modelObj = models.find((m) => m.id === model);
-    setRun({
-      id,
-      prompt: fullPrompt,
-      promptPreview: prompt.slice(0, 120),
-      benchmark: detectBenchmark(fullPrompt),
-      modelId: model,
-      modelDisplay: modelObj?.display || model,
-      mode: selected.length === 1 ? "single" : "compare",
-      providers: selected.map((slug) => ({ slug, status: "pending" })),
-    });
-  };
-
-  const retry = (slug: string) => {
-    if (!run) return;
-    setRun((prev) =>
-      prev
-        ? { ...prev, providers: prev.providers.map((p) => (p.slug === slug ? { slug, status: "pending" } : p)) }
-        : prev,
-    );
-  };
-
-  // Launch any pending providers
+  // Set model + provider defaults from API data the first time they load
   useEffect(() => {
-    if (!run) return;
-    const pending = run.providers.filter((r) => r.status === "pending");
-    if (pending.length === 0) return;
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    pending.forEach((r, i) => {
-      const startDelay = 80 + i * 200;
-      timers.push(
-        setTimeout(() => {
-          setRun((prev) =>
-            prev && prev.id === run.id
-              ? {
-                  ...prev,
-                  providers: prev.providers.map((p) =>
-                    p.slug === r.slug ? { ...p, status: "running", startAt: Date.now() } : p,
-                  ),
-                }
-              : prev,
-          );
-        }, startDelay),
-      );
-      const finishDelay = startDelay + 900 + (strHash(r.slug + run.id) % 1500);
-      timers.push(
-        setTimeout(() => {
-          const provider = providers.find((x) => x.slug === r.slug)!;
-          const failProb = r.slug === "replicate" ? 0.45 : r.slug === "anyscale" ? 0.08 : 0;
-          const fail = (strHash(r.slug + run.id + "f") % 100) / 100 < failProb;
-          const inputTokens = Math.max(40, Math.round(fullPrompt.length / 4));
-          const baseOut = 280 + (strHash(r.slug + run.id + "o") % 480);
-          const outputTokens = Math.round(baseOut * (PROVIDER_STYLE[r.slug]?.verbosity ?? 1));
-          const cost = tokenCost(provider, inputTokens, outputTokens);
-          const latencyJitter = ((strHash(r.slug + run.id + "l") % 100) - 50) / 200;
-          const ttftJitter = ((strHash(r.slug + run.id + "t") % 100) - 50) / 500;
+    if (defaultsInitialized.current) return;
+    if (providers.length === 0 || models.length === 0) return;
+    defaultsInitialized.current = true;
 
-          setRun((prev) => {
-            if (!prev || prev.id !== run.id) return prev;
-            const next: RunState = {
-              ...prev,
-              providers: prev.providers.map((p) =>
-                p.slug === r.slug
-                  ? {
-                      ...p,
-                      status: fail ? ("failed" as const) : ("completed" as const),
-                      completeAt: Date.now(),
-                      latency: Math.max(0.3, provider.latency + latencyJitter),
-                      ttft: Math.max(0.1, provider.ttft + ttftJitter),
-                      cost: fail ? null : cost,
-                      inputTokens,
-                      outputTokens,
-                      response: fail ? null : getMockResponse(fullPrompt, r.slug),
-                      error: fail ? "Timeout after 30s · cold start on shared GPU" : null,
-                    }
-                  : p,
+    const targetModel = model || models[0].id;
+    if (!model) setModel(targetModel);
+
+    if (activeProviders.length === 0) {
+      const defaults = providers
+        .filter((p) => p.type !== "inference" && p.modelPricing[targetModel])
+        .slice(0, 3)
+        .map((p) => p.slug);
+      setActiveProviders(
+        defaults.length > 0
+          ? defaults
+          : providers.filter((p) => p.type !== "inference").slice(0, 3).map((p) => p.slug),
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [providers, models]);
+
+  const inFlight = useMemo(
+    () =>
+      messages.some(
+        (m) =>
+          m.role === "assistant" &&
+          m.responses.some((r) => r.status === "pending" || r.status === "running"),
+      ),
+    [messages],
+  );
+
+  const supportedSlugs = useMemo(
+    () =>
+      new Set(
+        providers.filter((p) => p.modelPricing && p.modelPricing[model]).map((p) => p.slug),
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [model, providers],
+  );
+
+  // Drop any active providers that don't support the new model
+  useEffect(() => {
+    const filtered = activeProviders.filter((s) => supportedSlugs.has(s));
+    if (filtered.length === activeProviders.length) return;
+    const padded =
+      filtered.length === 0 && supportedSlugs.size > 0
+        ? [Array.from(supportedSlugs)[0]]
+        : filtered;
+    setActiveProviders(padded);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [model]);
+
+  // Scroll latest user message to viewport top after submit (ChatGPT-style)
+  useEffect(() => {
+    if (latestUserAnchorRef.current) {
+      latestUserAnchorRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [messages.length]);
+
+  const updateResponse = (
+    prev: Message[],
+    turnId: string,
+    slug: string,
+    updater: (r: Response) => Response,
+  ): Message[] =>
+    prev.map((m) =>
+      m.role === "assistant" && m.turnId === turnId
+        ? { ...m, responses: m.responses.map((r) => (r.slug === slug ? updater(r) : r)) }
+        : m,
+    );
+
+  const fanOut = async (turnId: string, text: string, slugs: string[]) => {
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+
+    const providerNames = slugs
+      .map((s) => providers.find((p) => p.slug === s)?.name)
+      .filter((n): n is string => Boolean(n));
+
+    const BASE =
+      (typeof process !== "undefined" && process.env.NEXT_PUBLIC_API_URL) ||
+      "http://localhost:8000";
+
+    let res: globalThis.Response;
+    try {
+      res = await fetch(`${BASE}/stream-test-result`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: text,
+          temperature,
+          max_tokens: maxTokens,
+          models: [model],
+          providers: providerNames,
+          ...(systemPrompt.trim() && { system_prompt: systemPrompt.trim() }),
+        }),
+        signal: ctrl.signal,
+      });
+    } catch (err: unknown) {
+      if ((err as { name?: string })?.name === "AbortError") return;
+      const msg = err instanceof Error ? err.message : String(err);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.role === "assistant" && m.turnId === turnId
+            ? {
+                ...m,
+                responses: m.responses.map((r) =>
+                  r.status !== "cancelled" ? { ...r, status: "failed", error: msg } : r,
+                ),
+              }
+            : m,
+        ),
+      );
+      return;
+    }
+
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const dataStr = line.slice(6).trim();
+          if (!dataStr) continue;
+          let event: Record<string, unknown>;
+          try {
+            event = JSON.parse(dataStr) as Record<string, unknown>;
+          } catch {
+            continue;
+          }
+          const pName = event.provider as string;
+          const slug = providers.find((p) => p.name === pName)?.slug;
+          if (!slug || !slugs.includes(slug)) continue;
+
+          if (event.__start__) {
+            setMessages((prev) =>
+              updateResponse(prev, turnId, slug, (r) =>
+                r.status === "cancelled" ? r : { ...r, status: "running" },
               ),
-            };
-            return { ...next, providers: buildScores(next.providers) };
-          });
-        }, finishDelay),
+            );
+          } else if (event.__error__) {
+            setMessages((prev) =>
+              updateResponse(prev, turnId, slug, (r) =>
+                r.status === "cancelled"
+                  ? r
+                  : { ...r, status: "failed", error: event.error as string },
+              ),
+            );
+          } else {
+            const prov = providers.find((p) => p.slug === slug);
+            const inTok = event.prompt_tokens as number | undefined;
+            const outTok = event.output_tokens as number | undefined;
+            // Use per-model listed price (with discount) for the model actually being tested
+            const mp = prov?.modelPricing[model];
+            const cost =
+              mp && inTok != null && outTok != null
+                ? (inTok * mp.listedIn) / 1e6 + (outTok * mp.listedOut) / 1e6
+                : null;
+            setMessages((prev) =>
+              updateResponse(prev, turnId, slug, (r) =>
+                r.status === "cancelled"
+                  ? r
+                  : {
+                      ...r,
+                      status: "completed",
+                      content: (event.output as string) || "",
+                      inputTokens: inTok,
+                      outputTokens: outTok,
+                      ttft:
+                        (event.ttft_ms as number | null) != null
+                          ? (event.ttft_ms as number) / 1000
+                          : undefined,
+                      latency:
+                        (event.e2e_ms as number | null) != null
+                          ? (event.e2e_ms as number) / 1000
+                          : undefined,
+                      cost,
+                    },
+              ),
+            );
+          }
+        }
+      }
+    } catch (err: unknown) {
+      if ((err as { name?: string })?.name === "AbortError") return;
+    } finally {
+      // any provider that never got a response (unsupported combo) → mark failed
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.role === "assistant" && m.turnId === turnId
+            ? {
+                ...m,
+                responses: m.responses.map((r) =>
+                  r.status === "pending" || r.status === "running"
+                    ? { ...r, status: "failed", error: "No response from provider" }
+                    : r,
+                ),
+              }
+            : m,
+        ),
+      );
+      if (abortRef.current === ctrl) abortRef.current = null;
+    }
+  };
+
+  const submit = () => {
+    const text = compose.trim();
+    if (!text || inFlight || activeProviders.length === 0) return;
+    const turnId = `t_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const userMsg: UserMessage = { id: `u_${turnId}`, role: "user", ts: Date.now(), content: text };
+    const assistantMsg: AssistantMessage = {
+      id: `a_${turnId}`,
+      role: "assistant",
+      ts: Date.now(),
+      turnId,
+      responses: activeProviders.map((slug) => ({ slug, status: "pending", thumb: null })),
+    };
+    setMessages((prev) => [...prev, userMsg, assistantMsg]);
+    setCompose("");
+    fanOut(turnId, text, activeProviders);
+  };
+
+  const retry = (turnId: string, slug: string) => {
+    const aIdx = messages.findIndex((m) => m.role === "assistant" && m.turnId === turnId);
+    if (aIdx < 1) return;
+    const userText = (messages[aIdx - 1] as UserMessage)?.content || "";
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.role === "assistant" && m.turnId === turnId
+          ? {
+              ...m,
+              responses: m.responses.map((r) =>
+                r.slug === slug ? { slug, status: "pending", thumb: null } : r,
+              ),
+            }
+          : m,
+      ),
+    );
+    fanOut(turnId, userText, [slug]);
+  };
+
+  const setThumb = (turnId: string, slug: string, thumb: "up" | "down") => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.role === "assistant" && m.turnId === turnId
+          ? {
+              ...m,
+              responses: m.responses.map((r) =>
+                r.slug === slug ? { ...r, thumb: r.thumb === thumb ? null : thumb } : r,
+              ),
+            }
+          : m,
+      ),
+    );
+  };
+
+  const resetChat = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setMessages([]);
+    setShowResetConfirm(false);
+    setEditingId(null);
+    setEditDraft("");
+    setTimeout(() => composeRef.current?.focus(), 50);
+  };
+
+  const stop = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.role !== "assistant"
+          ? m
+          : {
+              ...m,
+              responses: m.responses.map((r) =>
+                r.status === "pending" || r.status === "running"
+                  ? { ...r, status: "cancelled" as const, error: "Cancelled" }
+                  : r,
+              ),
+            },
+      ),
+    );
+  };
+
+  const regenerateTurn = (targetTurnId: string) => {
+    if (inFlight) return;
+    const aIdx = messages.findIndex(
+      (m) => m.role === "assistant" && m.turnId === targetTurnId,
+    );
+    if (aIdx < 1) return;
+    const userText = (messages[aIdx - 1] as UserMessage)?.content || "";
+    if (!userText) return;
+    abortRef.current?.abort();
+    abortRef.current = null;
+    const turnId = `t_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    setMessages((prev) => {
+      const truncated = prev.slice(0, aIdx + 1);
+      return truncated.map((m, i) =>
+        i === aIdx
+          ? {
+              ...(m as AssistantMessage),
+              ts: Date.now(),
+              turnId,
+              responses: activeProviders.map((slug) => ({ slug, status: "pending" as const, thumb: null })),
+            }
+          : m,
       );
     });
-    return () => timers.forEach(clearTimeout);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [run?.id, run?.providers.map((r) => r.slug + r.status).join("|")]);
+    fanOut(turnId, userText, activeProviders);
+  };
 
-  // Record to history once per run
-  const recordedRuns = useRef(new Set<string>());
-  useEffect(() => {
-    if (!run || !allDone) return;
-    if (recordedRuns.current.has(run.id)) return;
-    recordedRuns.current.add(run.id);
-    setHistory((h) =>
-      [
-        {
-          id: run.id,
-          prompt,
-          mode: run.mode,
-          modelDisplay: run.modelDisplay,
-          providerSlugs: run.providers.map((r) => r.slug),
-          providers: run.providers,
-          timestamp: Date.now(),
-        },
-        ...h,
-      ].slice(0, 5),
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allDone, run?.id]);
+  const startEdit = (msg: UserMessage) => {
+    if (inFlight) return;
+    setEditingId(msg.id);
+    setEditDraft(msg.content);
+  };
 
-  // ⌘↩ run
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditDraft("");
+  };
+
+  const resubmitEdit = () => {
+    const text = editDraft.trim();
+    if (!text) return;
+    const idx = messages.findIndex((m) => m.id === editingId);
+    if (idx < 0) return;
+    abortRef.current?.abort();
+    abortRef.current = null;
+    const truncated = messages.slice(0, idx);
+    const turnId = `t_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const userMsg: UserMessage = { id: `u_${turnId}`, role: "user", ts: Date.now(), content: text };
+    const assistantMsg: AssistantMessage = {
+      id: `a_${turnId}`,
+      role: "assistant",
+      ts: Date.now(),
+      turnId,
+      responses: activeProviders.map((slug) => ({ slug, status: "pending", thumb: null })),
+    };
+    setMessages([...truncated, userMsg, assistantMsg]);
+    setEditingId(null);
+    setEditDraft("");
+    fanOut(turnId, text, activeProviders);
+  };
+
+  // Cmd+Enter → submit
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
         e.preventDefault();
-        if (!run || allDone) start();
+        submit();
       }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prompt, selected, systemPrompt, promptMode, run, allDone]);
+  }, [compose, activeProviders, inFlight]);
+
+  const turnCount = useMemo(() => messages.filter((m) => m.role === "user").length, [messages]);
+  const modelDisplay = models.find((m) => m.id === model)?.display || model;
 
   return (
-    <>
-      <section className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-6 border-b border-ink-600">
-        <div className="flex items-end justify-between flex-wrap gap-4">
-          <div>
-            <div className="micro text-smoke">{t("run.tool")}</div>
-            <h1 className="serif text-4xl sm:text-5xl lg:text-6xl tracking-editorial mt-2">
-              {t("run.headPre")}{" "}
-              <span className="serif-it text-brand">
-                {selected.length === 1 ? t("run.headOneAnswer") : t("run.headNTruths")}
-              </span>
-            </h1>
-            <p className="text-ash mt-3 max-w-2xl text-[15px] leading-relaxed">
-              {selected.length === 1 ? t("run.subSingle") : t("run.subCompare")}
-            </p>
-          </div>
-          {run && (
-            <div className="flex items-center gap-2">
+    <Fragment>
+      {/* ── TOP BAR ──────────────────────────────────────────────────────── */}
+      <section className="sticky top-16 z-30 border-b border-ink-600 bg-ink/85 backdrop-blur-md">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3 flex-wrap min-w-0">
+            <div className="shrink-0">
+              <div className="micro text-smoke">{t("run.tool")}</div>
+              <div className="text-bone tracking-tight text-[14px] -mt-0.5">
+                {t("run.chatTitle")}
+              </div>
+            </div>
+            <div className="h-8 w-px bg-ink-600 hidden sm:block shrink-0" />
+            <div className="shrink-0">
+              <ModelDropdown value={model} onChange={setModel} disabled={inFlight} />
+            </div>
+            <div className="shrink-0">
               <button
-                onClick={() => {
-                  setRun(null);
-                  promptRef.current?.focus();
-                }}
-                className="btn-ghost px-4 py-2 text-[12px] inline-flex items-center gap-2"
+                onClick={() => setShowPickerModal(true)}
+                disabled={inFlight}
+                className="px-3 py-1.5 text-[12px] border border-ink-500 hover:border-bone text-bone inline-flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
-                <I.refresh className="w-3.5 h-3.5" /> {t("run.newComparison")}
+                <span className="micro text-smoke">{t("run.topbarProvidersLabel")}</span>
+                <span className="flex -space-x-1">
+                  {activeProviders.slice(0, 4).map((slug) => (
+                    <span key={slug} className="ring-1 ring-ink-800 inline-block leading-none">
+                      <ProviderMark slug={slug} size={14} />
+                    </span>
+                  ))}
+                  {activeProviders.length > 4 && (
+                    <span className="w-3.5 h-3.5 ring-1 ring-ink-800 bg-ink-700 flex items-center justify-center text-[8px] num text-ash">
+                      +{activeProviders.length - 4}
+                    </span>
+                  )}
+                </span>
+                <span className="num">{activeProviders.length}</span>
+                <svg viewBox="0 0 12 12" className="w-2.5 h-2.5 text-ash">
+                  <path d="M3 5l3 3 3-3" stroke="currentColor" fill="none" strokeWidth="1.25" />
+                </svg>
               </button>
             </div>
-          )}
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setShowParams(true)}
+              className="text-smoke hover:text-bone p-2 transition-colors"
+              title={t("run.paramsLabel")}
+            >
+              <IconSliders className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => (messages.length === 0 ? null : setShowResetConfirm(true))}
+              disabled={messages.length === 0}
+              className="px-3 py-1.5 text-[12px] border border-ink-500 hover:border-bone/40 text-ash hover:text-bone inline-flex items-center gap-1.5 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              <I.refresh className="w-3.5 h-3.5" /> {t("run.newChat")}
+            </button>
+          </div>
         </div>
       </section>
 
-      <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-10 grid lg:grid-cols-[420px_1fr] gap-px bg-ink-600">
-        {/* SETUP PANEL */}
-        <div className="bg-ink p-5 sm:p-6 lg:p-8 space-y-8">
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <div className="micro text-smoke">{t("run.labelPrompt")}</div>
-              <div className="flex gap-0.5 border border-ink-500">
-                {(
-                  [
-                    ["single", t("run.modeSingle")],
-                    ["system_user", t("run.modeSysUser")],
-                  ] as const
-                ).map(([v, l]) => (
-                  <button
-                    key={v}
-                    onClick={() => setPromptMode(v)}
-                    className={cx(
-                      "px-2.5 py-1 text-[10px] tracking-wider uppercase transition-colors",
-                      promptMode === v ? "bg-brand text-ink" : "text-smoke hover:text-bone",
-                    )}
-                  >
-                    {l}
-                  </button>
-                ))}
-              </div>
-            </div>
-            {promptMode === "system_user" && (
-              <>
-                <div className="micro text-smoke mb-1.5">{t("run.labelSystem")}</div>
-                <textarea
-                  value={systemPrompt}
-                  onChange={(e) => setSystemPrompt(e.target.value)}
-                  rows={2}
-                  placeholder={t("run.sysPlaceholder")}
-                  className="w-full bg-ink-800 border border-ink-500 focus:border-brand/60 outline-none p-3 text-[12px] resize-none text-ash leading-relaxed mb-2"
-                />
-                <div className="micro text-smoke mb-1.5">{t("run.labelUser")}</div>
-              </>
-            )}
-            <textarea
-              ref={promptRef}
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              rows={5}
-              placeholder={t("run.promptPlaceholder")}
-              className="w-full bg-ink-800 border border-ink-500 focus:border-brand/60 outline-none p-3 text-[13px] resize-none text-bone leading-relaxed"
+      {/* ── BODY ─────────────────────────────────────────────────────────── */}
+      {messages.length === 0 ? (
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
+          <EmptyChatHero
+            onPick={(p) => {
+              setCompose(p);
+              composeRef.current?.focus();
+            }}
+            activeProviders={activeProviders}
+            providers={providers}
+            composeNode={
+              <ComposeBox
+                value={compose}
+                onChange={setCompose}
+                onSubmit={submit}
+                onStop={stop}
+                inFlight={inFlight}
+                disabled={activeProviders.length === 0}
+                disabledReason={activeProviders.length === 0 ? t("run.composeNoProviders") : null}
+                inputRef={composeRef}
+                providerCount={activeProviders.length}
+                t={t}
+              />
+            }
+            t={t}
+          />
+        </div>
+      ) : (
+        <Fragment>
+          <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-32">
+            <MessageList
+              messages={messages}
+              onThumb={setThumb}
+              onRetry={retry}
+              onRegenerate={regenerateTurn}
+              canRegenerate={!inFlight}
+              editingId={editingId}
+              editDraft={editDraft}
+              onEditDraftChange={setEditDraft}
+              onStartEdit={startEdit}
+              onCancelEdit={cancelEdit}
+              onSubmitEdit={resubmitEdit}
+              canEdit={!inFlight}
+              latestUserAnchorRef={latestUserAnchorRef}
+              providers={providers}
+              t={t}
+              toast={toast}
             />
-            <div className="mt-1 flex justify-end">
-              <div className="micro text-smoke">
-                <span className="kbd">⌘</span>
-                <span className="kbd ml-0.5">↩</span> {t("run.runHotkey")}
-              </div>
-            </div>
-            <div className="mt-4 pt-4 border-t border-ink-600">
-              <div className="micro text-smoke mb-2">{t("run.samplesLabel")}</div>
-              <div className="flex flex-wrap gap-1.5">
-                {BENCHMARK_TEMPLATES.map((tpl) => {
-                  const active = prompt.trim() === tpl.prompt.trim();
-                  return (
-                    <button
-                      key={tpl.id}
-                      onClick={() => setPrompt(tpl.prompt)}
-                      className={cx(
-                        "px-2.5 py-1 text-[11px] border transition-colors",
-                        active
-                          ? "border-brand text-brand bg-brand/5"
-                          : "border-ink-500 hover:border-brand hover:text-brand text-ash",
-                      )}
-                    >
-                      {t("run.tpl" + tpl.id.charAt(0).toUpperCase() + tpl.id.slice(1))}
-                    </button>
-                  );
-                })}
-              </div>
+            <div ref={threadBottomRef} />
+          </div>
+          {/* Fixed bottom compose */}
+          <div className="fixed bottom-0 left-0 right-0 z-20 bg-ink/95 backdrop-blur-md border-t border-ink-600">
+            <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-3">
+              <ComposeBox
+                value={compose}
+                onChange={setCompose}
+                onSubmit={submit}
+                onStop={stop}
+                inFlight={inFlight}
+                disabled={activeProviders.length === 0}
+                disabledReason={activeProviders.length === 0 ? t("run.composeNoProviders") : null}
+                inputRef={composeRef}
+                providerCount={activeProviders.length}
+                t={t}
+              />
             </div>
           </div>
+        </Fragment>
+      )}
 
-          <Section label={t("run.labelModel")}>
-            <ModelDropdown value={model} onChange={setModel} />
-            <div className="mt-2 micro text-smoke">
-              {t("run.modelSupportCount", { n: providers.length })}
-            </div>
-          </Section>
+      {/* ── NEW CHAT CONFIRM MODAL ────────────────────────────────────────── */}
+      {showResetConfirm && (
+        <Modal onClose={() => setShowResetConfirm(false)} size="md">
+          <h3 className="serif text-2xl tracking-editorial mb-3">
+            {t("run.newChatConfirmTitle")}
+          </h3>
+          <p className="text-[13px] text-ash leading-relaxed mb-6">
+            {t("run.newChatConfirmBody", { n: turnCount })}
+          </p>
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => setShowResetConfirm(false)}
+              className="btn-ghost px-4 py-2 text-[12px]"
+            >
+              {t("run.newChatConfirmKeep")}
+            </button>
+            <button onClick={resetChat} className="btn-brand px-4 py-2 text-[12px]">
+              {t("run.newChatConfirmReset")}
+            </button>
+          </div>
+        </Modal>
+      )}
 
-          <Section label={t("run.labelProviders")}>
-            <div className="micro text-smoke mb-2 flex items-center justify-between">
-              <span>{t("run.selectedCount", { n: selected.length })}</span>
-              {selected.length >= 2 && <span className="text-ash">{t("run.compareMode")}</span>}
-              {selected.length === 1 && <span className="text-ash">{t("run.singleMode")}</span>}
-            </div>
-            <div className="space-y-1">
-              {providers.map((p) => {
-                const on = selected.includes(p.slug);
-                return (
-                  <button
-                    key={p.slug}
-                    onClick={() => {
-                      if (on) {
-                        if (selected.length === 1) {
-                          toast.show(t("run.keepAtLeast1"));
-                          return;
-                        }
-                        setSelected(selected.filter((x) => x !== p.slug));
-                      } else if (selected.length < 5) {
-                        setSelected([...selected, p.slug]);
-                      } else {
-                        toast.show(t("run.max5Providers"));
-                      }
-                    }}
-                    className={cx(
-                      "w-full flex items-center gap-3 px-3 py-2 border transition-colors text-left",
-                      on ? "border-brand/60 bg-brand/5" : "border-ink-600 hover:border-bone/30",
-                    )}
-                  >
-                    <span className={cx("check", on && "on")}>
-                      {on && <I.check className="w-2.5 h-2.5 text-ink" />}
-                    </span>
-                    <ProviderMark slug={p.slug} />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[13px] text-bone truncate">{p.name}</div>
-                      <div className="micro text-smoke">{p.type}</div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <div className="num text-[12px]">{fmtUSD(p.cost, 2)}</div>
-                      <TrustBadge score={p.trust} />
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </Section>
-
-          <Section label={t("run.labelAdvanced")}>
-            <div className="space-y-4 text-[12px]">
-              <div className="grid grid-cols-[88px_1fr_56px] items-center gap-3">
-                <span className="text-ash">{t("run.temperature")}</span>
+      {/* ── PARAMS MODAL ─────────────────────────────────────────────────── */}
+      {showParams && (
+        <Modal onClose={() => setShowParams(false)} size="md">
+          <h3 className="serif text-2xl tracking-editorial mb-2">
+            {t("run.paramsModalTitle")}
+          </h3>
+          <p className="micro text-smoke mb-6">{t("run.paramsChangesHint")}</p>
+          <div className="space-y-6">
+            <div>
+              <div className="micro text-smoke mb-2">{t("run.temperature")}</div>
+              <div className="grid grid-cols-[1fr_56px] items-center gap-3">
                 <RangeInput
                   min={0}
                   max={2}
@@ -400,12 +681,12 @@ function RunPageInner() {
                   value={temperature}
                   onChange={setTemperature}
                 />
-                <span className="num text-bone text-right">
-                  {temperature.toFixed(1)}
-                </span>
+                <span className="num text-bone text-right">{temperature.toFixed(1)}</span>
               </div>
-              <div className="grid grid-cols-[88px_1fr_56px] items-center gap-3">
-                <span className="text-ash">{t("run.maxTokens")}</span>
+            </div>
+            <div>
+              <div className="micro text-smoke mb-2">{t("run.maxTokens")}</div>
+              <div className="grid grid-cols-[1fr_56px] items-center gap-3">
                 <RangeInput
                   min={128}
                   max={4096}
@@ -415,925 +696,743 @@ function RunPageInner() {
                 />
                 <span className="num text-bone text-right">{maxTokens}</span>
               </div>
-              <button
-                onClick={() => setFallback(!fallback)}
-                className="w-full flex items-center justify-between border-t border-ink-600 pt-3"
-              >
-                <span className="text-ash">{t("run.allowFallback")}</span>
-                <span className={cx("check", fallback && "on")}>
-                  {fallback && <I.check className="w-2.5 h-2.5 text-ink" />}
-                </span>
-              </button>
-              {!fallback && (
-                <div className="text-amber/80 text-[11px] flex gap-2 leading-relaxed">
-                  <I.alert className="w-3 h-3 mt-0.5 shrink-0" />
-                  {t("run.fallbackOff")}
-                </div>
-              )}
             </div>
-          </Section>
+            <div>
+              <div className="micro text-smoke mb-2">{t("run.systemPromptLabel")}</div>
+              <textarea
+                value={systemPrompt}
+                onChange={(e) => setSystemPrompt(e.target.value)}
+                rows={4}
+                placeholder={t("run.systemPromptPlaceholder")}
+                className="w-full bg-ink-800 border border-ink-500 focus:border-brand/60 outline-none p-3 text-[13px] resize-none text-bone leading-relaxed"
+              />
+            </div>
+          </div>
+        </Modal>
+      )}
 
-          <button
-            onClick={start}
-            disabled={!prompt || selected.length < 1 || (run !== null && !allDone)}
-            className="btn-brand w-full py-3.5 text-sm font-medium tracking-tight inline-flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <I.bolt className="w-4 h-4" />
-            {run && !allDone
-              ? t("run.btnRunning")
-              : run
-                ? selected.length === 1
-                  ? t("run.btnRerun")
-                  : t("run.btnRerunCompare")
-                : selected.length === 1
-                  ? t("run.btnRun")
-                  : t("run.btnRunCompare")}
-          </button>
-          <div className="flex items-center justify-between micro text-smoke">
-            <span>{t("run.estimatedCost")}</span>
-            <span className="num text-ash">~{fmtUSD(estimatedCost, 4)}</span>
+      {/* ── PROVIDERS PICKER MODAL ────────────────────────────────────────── */}
+      {showPickerModal && (() => {
+        const supported = providers.filter((p) => supportedSlugs.has(p.slug));
+        const unsupported = providers.filter((p) => !supportedSlugs.has(p.slug));
+
+        const renderRow = (p: (typeof providers)[0]) => {
+          const on = activeProviders.includes(p.slug);
+          const isSupp = supportedSlugs.has(p.slug);
+          return (
+            <button
+              key={p.slug}
+              onClick={() => {
+                if (!isSupp) return;
+                if (on) {
+                  if (activeProviders.length === 1) return;
+                  setActiveProviders(activeProviders.filter((x) => x !== p.slug));
+                } else if (activeProviders.length < 5) {
+                  setActiveProviders([...activeProviders, p.slug]);
+                } else {
+                  toast.show(t("run.max5Providers"));
+                }
+              }}
+              disabled={!isSupp}
+              title={
+                !isSupp
+                  ? t("run.providersUnsupportedByModel", { model: modelDisplay })
+                  : ""
+              }
+              className={cx(
+                "w-full flex items-center gap-3 px-3 py-2 border transition-colors text-left",
+                on ? "border-brand/60 bg-brand/5" : "border-ink-600 hover:border-bone/30",
+                !isSupp && "opacity-50 cursor-not-allowed",
+              )}
+            >
+              <span className={cx("check", on && "on")}>
+                {on && <I.check className="w-2.5 h-2.5 text-ink" />}
+              </span>
+              <ProviderMark slug={p.slug} />
+              <div className="flex-1 min-w-0">
+                <div className="text-[13px] text-bone truncate">{p.name}</div>
+                <div className="micro text-smoke">{p.type}</div>
+              </div>
+              {isSupp ? (
+                <TrustBadge score={p.trust} />
+              ) : (
+                <span className="text-[11px] text-amber italic shrink-0">
+                  {t("run.providersUnsupportedByModel", { model: modelDisplay })}
+                </span>
+              )}
+            </button>
+          );
+        };
+
+        return (
+          <Modal onClose={() => setShowPickerModal(false)} size="md">
+            <h3 className="serif text-2xl tracking-editorial mb-2">
+              {t("run.providersPickerLabel")}
+            </h3>
+            <p className="micro text-smoke mb-2">{t("run.providersChangesHint")}</p>
+            {unsupported.length > 0 && (
+              <p className="text-[12px] text-amber mb-4 flex items-start gap-1.5 leading-relaxed">
+                <I.info className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                <span>
+                  {t("run.providersFilterHint", {
+                    n: unsupported.length,
+                    model: modelDisplay,
+                  })}
+                </span>
+              </p>
+            )}
+            <div className="space-y-1">{supported.map(renderRow)}</div>
+            {unsupported.length > 0 && (
+              <Fragment>
+                <div className="mt-4 mb-2 micro text-smoke">
+                  {t("run.providersUnsupportedSection")}
+                </div>
+                <div className="space-y-1">{unsupported.map(renderRow)}</div>
+              </Fragment>
+            )}
+            <div className="mt-5 flex justify-end">
+              <button
+                onClick={() => setShowPickerModal(false)}
+                className="btn-brand px-4 py-2 text-[12px]"
+              >
+                {t("run.providersClose")}
+              </button>
+            </div>
+          </Modal>
+        );
+      })()}
+    </Fragment>
+  );
+}
+
+// ─── EmptyChatHero ────────────────────────────────────────────────────────────
+
+interface EmptyChatHeroProps {
+  onPick: (prompt: string) => void;
+  activeProviders: string[];
+  providers: { slug: string; name: string }[];
+  composeNode: React.ReactNode;
+  t: (key: string, vars?: Record<string, string | number>) => string;
+}
+
+function EmptyChatHero({
+  onPick,
+  activeProviders,
+  providers,
+  composeNode,
+  t,
+}: EmptyChatHeroProps) {
+  return (
+    <div className="min-h-[calc(100vh-180px)] flex items-center justify-center py-12">
+      <div className="w-full max-w-3xl">
+        <h2 className="serif text-3xl sm:text-4xl lg:text-5xl tracking-editorial text-center mb-3">
+          {t("run.emptyHeroTitle")}
+        </h2>
+        {activeProviders.length > 0 ? (
+          <div className="flex items-center justify-center gap-2 flex-wrap text-[12px] text-ash mb-8">
+            <span className="text-smoke">{t("run.emptyDestinationLabel")}</span>
+            {activeProviders.map((slug, i) => {
+              const p = providers.find((x) => x.slug === slug);
+              if (!p) return null;
+              return (
+                <Fragment key={slug}>
+                  <span className="inline-flex items-center gap-1.5">
+                    <ProviderMark slug={slug} size={16} />
+                    <span className="text-bone">{p.name}</span>
+                  </span>
+                  {i < activeProviders.length - 1 && <span className="text-smoke">·</span>}
+                </Fragment>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-[12px] text-amber text-center mb-8">
+            {t("run.composeNoProviders")}
+          </p>
+        )}
+        {composeNode}
+        <div className="mt-8 flex flex-wrap gap-1.5 justify-center">
+          {BENCHMARK_TEMPLATES.map((tpl) => {
+            return (
+              <button
+                key={tpl.id}
+                onClick={() => onPick(t("run.tplPrompts." + tpl.id))}
+                className="px-3 py-1.5 text-[12px] border border-ink-500 hover:border-brand hover:text-brand text-ash transition-colors"
+              >
+                {t("run.tpl" + tpl.id.charAt(0).toUpperCase() + tpl.id.slice(1))}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── MessageList ──────────────────────────────────────────────────────────────
+
+interface MessageListProps {
+  messages: Message[];
+  onThumb: (turnId: string, slug: string, thumb: "up" | "down") => void;
+  onRetry: (turnId: string, slug: string) => void;
+  onRegenerate: (turnId: string) => void;
+  canRegenerate: boolean;
+  editingId: string | null;
+  editDraft: string;
+  onEditDraftChange: (v: string) => void;
+  onStartEdit: (msg: UserMessage) => void;
+  onCancelEdit: () => void;
+  onSubmitEdit: () => void;
+  canEdit: boolean;
+  latestUserAnchorRef: React.RefObject<HTMLDivElement | null>;
+  providers: { slug: string; name: string; trust: number; latency: number; ttft: number }[];
+  t: (key: string, vars?: Record<string, string | number>) => string;
+  toast: { show: (msg: string) => void };
+}
+
+function MessageList({
+  messages,
+  onThumb,
+  onRetry,
+  onRegenerate,
+  canRegenerate,
+  editingId,
+  editDraft,
+  onEditDraftChange,
+  onStartEdit,
+  onCancelEdit,
+  onSubmitEdit,
+  canEdit,
+  latestUserAnchorRef,
+  providers,
+  t,
+  toast,
+}: MessageListProps) {
+  const lastAssistantId = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "assistant") return messages[i].id;
+    }
+    return null;
+  }, [messages]);
+
+  const lastUserId = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "user") return messages[i].id;
+    }
+    return null;
+  }, [messages]);
+
+  return (
+    <div className="space-y-6">
+      {messages.map((m) =>
+        m.role === "user" ? (
+          <UserBubble
+            key={m.id}
+            msg={m}
+            isLast={m.id === lastUserId}
+            canEdit={canEdit}
+            isEditing={editingId === m.id}
+            editDraft={editDraft}
+            onEditDraftChange={onEditDraftChange}
+            onStartEdit={onStartEdit}
+            onCancelEdit={onCancelEdit}
+            onSubmitEdit={onSubmitEdit}
+            anchorRef={m.id === lastUserId ? latestUserAnchorRef : null}
+            t={t}
+          />
+        ) : (
+          <AssistantRow
+            key={m.id}
+            row={m as AssistantMessage}
+            onThumb={onThumb}
+            onRetry={onRetry}
+            isLast={m.id === lastAssistantId}
+            onRegenerate={onRegenerate}
+            canRegenerate={canRegenerate}
+            providers={providers}
+            t={t}
+            toast={toast}
+          />
+        ),
+      )}
+      {messages.length > 0 && (
+        <div aria-hidden="true" style={{ minHeight: "calc(100vh - 320px)" }} />
+      )}
+    </div>
+  );
+}
+
+// ─── UserBubble ───────────────────────────────────────────────────────────────
+
+interface UserBubbleProps {
+  msg: UserMessage;
+  isLast: boolean;
+  canEdit: boolean;
+  isEditing: boolean;
+  editDraft: string;
+  onEditDraftChange: (v: string) => void;
+  onStartEdit: (msg: UserMessage) => void;
+  onCancelEdit: () => void;
+  onSubmitEdit: () => void;
+  anchorRef: React.RefObject<HTMLDivElement | null> | null;
+  t: (key: string, vars?: Record<string, string | number>) => string;
+}
+
+function UserBubble({
+  msg,
+  isLast,
+  canEdit,
+  isEditing,
+  editDraft,
+  onEditDraftChange,
+  onStartEdit,
+  onCancelEdit,
+  onSubmitEdit,
+  anchorRef,
+  t,
+}: UserBubbleProps) {
+  const time = new Date(msg.ts).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const showEditAffordance = canEdit && !isEditing;
+  const scrollPadStyle = { scrollMarginTop: "140px" };
+
+  if (isEditing) {
+    return (
+      <div ref={anchorRef} style={scrollPadStyle} className="flex justify-end">
+        <div className="w-full max-w-[90%] sm:max-w-[80%] md:max-w-[70%]">
+          <textarea
+            value={editDraft}
+            onChange={(e) => onEditDraftChange(e.target.value)}
+            onKeyDown={(e) => {
+              if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                e.preventDefault();
+                onSubmitEdit();
+              }
+              if (e.key === "Escape") onCancelEdit();
+            }}
+            autoFocus
+            rows={3}
+            className="w-full bg-ink-800 border border-brand/60 outline-none p-3 text-[14px] resize-y text-bone leading-relaxed"
+            style={{ minHeight: 72 }}
+          />
+          <div className="mt-2 flex items-center justify-end gap-2">
+            <button onClick={onCancelEdit} className="btn-ghost px-3 py-1.5 text-[12px]">
+              {t("run.editCancel")}
+            </button>
+            <button
+              onClick={onSubmitEdit}
+              disabled={!editDraft.trim()}
+              className="btn-brand px-3 py-1.5 text-[12px] inline-flex items-center gap-1.5 disabled:opacity-40"
+            >
+              <I.refresh className="w-3 h-3" /> {t("run.editResubmit")}
+            </button>
           </div>
         </div>
+      </div>
+    );
+  }
 
-        {/* RESULTS PANEL */}
-        <div className="bg-ink p-5 sm:p-6 lg:p-8 min-h-[600px]">
-          {!run ? (
-            <EmptyRun mode={selected.length === 1 ? "single" : "compare"} />
-          ) : selected.length === 1 ? (
-            <SingleProviderResult
-              run={run}
-              onPay={() => {
-                const r = run.providers[0];
-                if (!r || r.status !== "completed") return;
-                if (!wallet) {
-                  setShowConnect(true);
-                  return;
-                }
-                const p = providers.find((x) => x.slug === r.slug)!;
-                setPayTarget({ provider: p, cost: r.cost! });
-              }}
-            />
-          ) : (
-            <div className="space-y-10">
-              <RunStatusList run={run} onRetry={retry} />
-              {allDone && completed.length >= 1 && (
-                <>
-                  <SummaryCards run={run} />
-                  <ResponseGrid run={run} />
-                  <EvaluationTable run={run} />
-                  <RecommendedAction run={run} />
-                </>
-              )}
-            </div>
+  return (
+    <div ref={anchorRef} style={scrollPadStyle} className="flex justify-end group">
+      <div className="max-w-[90%] sm:max-w-[70%] md:max-w-[60%]">
+        <div className="micro text-smoke mb-1 text-right flex items-center justify-end gap-2">
+          {showEditAffordance && (
+            <button
+              onClick={() => onStartEdit(msg)}
+              className="opacity-0 group-hover:opacity-100 transition-opacity text-smoke hover:text-bone inline-flex items-center gap-1"
+              title={t("run.editBtn")}
+            >
+              <I.refresh className="w-3 h-3" />
+              <span className="micro">{t("run.editBtn")}</span>
+            </button>
           )}
+          <span>
+            {t("run.youLabel")} · {time}
+          </span>
+        </div>
+        <div className="bg-ink-700/60 border border-ink-500 px-4 py-2.5 text-bone text-[14px] leading-relaxed whitespace-pre-wrap">
+          {msg.content}
         </div>
       </div>
-
-      {history.length > 0 && (
-        <RecentRuns
-          history={history}
-          onClear={() => setHistory([])}
-          onReuse={(h) => {
-            setPrompt(h.prompt);
-            setSelected(h.providerSlugs);
-            promptRef.current?.focus();
-            window.scrollTo({ top: 0, behavior: "smooth" });
-          }}
-        />
-      )}
-
-      {payTarget && (
-        <PaymentModal
-          provider={payTarget.provider}
-          cost={payTarget.cost}
-          onClose={() => setPayTarget(null)}
-        />
-      )}
-    </>
+    </div>
   );
 }
 
-/* ---------- sub-components ---------- */
+// ─── AssistantRow ─────────────────────────────────────────────────────────────
 
-function Section({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+interface AssistantRowProps {
+  row: AssistantMessage;
+  onThumb: (turnId: string, slug: string, thumb: "up" | "down") => void;
+  onRetry: (turnId: string, slug: string) => void;
+  isLast: boolean;
+  onRegenerate: (turnId: string) => void;
+  canRegenerate: boolean;
+  providers: { slug: string; name: string; trust: number; latency: number; ttft: number }[];
+  t: (key: string, vars?: Record<string, string | number>) => string;
+  toast: { show: (msg: string) => void };
+}
+
+function AssistantRow({
+  row,
+  onThumb,
+  onRetry,
+  isLast,
+  onRegenerate,
+  canRegenerate,
+  providers,
+  t,
+  toast,
+}: AssistantRowProps) {
+  const n = row.responses.length;
+  const gridCls =
+    n === 1
+      ? "grid-cols-1"
+      : n === 2
+        ? "grid-cols-1 md:grid-cols-2"
+        : n === 3
+          ? "grid-cols-1 md:grid-cols-3"
+          : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3";
+  const allDone = row.responses.every(
+    (r) => r.status === "completed" || r.status === "failed" || r.status === "cancelled",
+  );
+  const showRegenerate = canRegenerate && allDone;
+
   return (
     <div>
-      <div className="micro text-smoke mb-3">{label}</div>
-      {children}
-    </div>
-  );
-}
-
-function EmptyRun({ mode }: { mode: "single" | "compare" }) {
-  const { t } = useLang();
-  return (
-    <div className="h-full flex items-center justify-center text-center py-32">
-      <div className="max-w-md">
-        <div className="serif text-7xl serif-it text-ink-500 mb-6">
-          {mode === "single" ? "∅" : "N=0"}
-        </div>
-        <div className="micro text-smoke mb-3">{t("run.emptyAwaiting")}</div>
-        <h3 className="serif text-3xl tracking-editorial">
-          {mode === "single" ? t("run.emptySingleTitle") : t("run.emptyCompareTitle")}{" "}
-          <span className="serif-it text-brand">{t("run.emptyYet")}</span>.
-        </h3>
-        <p className="mt-3 text-ash text-[14px] leading-relaxed">
-          {mode === "single" ? (
-            <>
-              {t("run.emptySingleBodyA")}
-              <span className="text-brand">{t("run.btnRun")}</span>.
-            </>
-          ) : (
-            <>
-              {t("run.emptyCompareBodyA")}
-              <span className="text-brand">{t("run.btnRun")}</span>
-              {t("run.emptyBodyB")}
-            </>
-          )}
-        </p>
-        <div className="mt-8 flex justify-center gap-2 micro text-smoke">
-          <span className="kbd">⌘</span>
-          <span className="kbd">↩</span>
-          <span>{t("run.emptyToRun")}</span>
-        </div>
+      <div className={cx("grid gap-3", gridCls)}>
+        {row.responses.map((r) => (
+          <ResponseCard
+            key={r.slug}
+            r={r}
+            turnId={row.turnId}
+            onThumb={onThumb}
+            onRetry={onRetry}
+            providers={providers}
+            t={t}
+            toast={toast}
+          />
+        ))}
       </div>
+      {showRegenerate && (
+        <div className="mt-2 flex justify-end">
+          <button
+            onClick={() => onRegenerate(row.turnId)}
+            className="px-3 py-1.5 text-[11px] border border-ink-500 hover:border-bone/40 text-ash hover:text-bone inline-flex items-center gap-1.5 transition-colors"
+            title={isLast ? t("run.regenerateBtn") : t("run.regenerateBtnOlder")}
+          >
+            <I.refresh className="w-3 h-3" /> {t("run.regenerateBtn")}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
-function SingleProviderResult({ run, onPay }: { run: RunState; onPay: () => void }) {
-  const { t } = useLang();
-  const { providers } = useData();
-  const r = run.providers[0];
-  const p = providers.find((x) => x.slug === r.slug)!;
-  const responseText = r.status === "completed" ? r.response || "" : "";
+// ─── MarkdownBody ─────────────────────────────────────────────────────────────
+
+function MarkdownBody({ text }: { text: string }) {
+  const html = useMemo(() => {
+    if (!text) return "";
+    if (typeof window === "undefined") return null;
+    // Use `marked` if available as a global (CDN), otherwise fall back to plain text
+    const w = window as unknown as { marked?: { parse: (t: string, opts?: object) => string } };
+    if (!w.marked) return null;
+    try {
+      return w.marked.parse(text, { breaks: true, gfm: true });
+    } catch {
+      return null;
+    }
+  }, [text]);
+
+  if (html === null) {
+    return (
+      <pre className="whitespace-pre-wrap text-[12.5px] leading-relaxed text-bone font-mono">
+        {text}
+      </pre>
+    );
+  }
+  return <div className="md-body" dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
+// ─── ResponseCard ─────────────────────────────────────────────────────────────
+
+interface ResponseCardProps {
+  r: Response;
+  turnId: string;
+  onThumb: (turnId: string, slug: string, thumb: "up" | "down") => void;
+  onRetry: (turnId: string, slug: string) => void;
+  providers: { slug: string; name: string; trust: number }[];
+  t: (key: string, vars?: Record<string, string | number>) => string;
+  toast: { show: (msg: string) => void };
+}
+
+function ResponseCard({ r, turnId, onThumb, onRetry, providers, t, toast }: ResponseCardProps) {
+  const p = providers.find((x) => x.slug === r.slug);
+  const responseText = r.status === "completed" ? r.content || "" : "";
   const stream = useStreamingText(responseText, 14);
 
-  const phaseLabel = (
-    {
-      pending: t("run.phaseQueued"),
-      running: t("run.phaseStreaming"),
-      completed: t("run.phaseComplete"),
-      failed: t("run.phaseFailed"),
-    } as Record<RunStatusRow["status"], string>
-  )[r.status];
-  const phaseTone =
-    r.status === "failed"
-      ? "text-coral"
-      : r.status === "completed"
-        ? "text-ash"
-        : "text-brand";
+  const phaseLabel: Record<Response["status"], string> = {
+    pending: t("run.phaseQueued"),
+    running: t("run.phaseStreaming"),
+    completed: t("run.phaseComplete"),
+    failed: t("run.phaseFailed"),
+    cancelled: t("run.phaseCancelled"),
+  };
+
+  const onCopy = () => {
+    if (!r.content) return;
+    copyToClipboard(r.content);
+    toast.show(t("run.copiedResponse", { name: p?.name ?? r.slug }));
+  };
+
+  if (!p) return null;
 
   return (
-    <div className="flex flex-col">
-      <div className="flex items-center justify-between border-b border-ink-600 pb-4 mb-4 gap-3 flex-wrap">
-        <div className="flex items-center gap-3">
-          <ProviderMark slug={r.slug} />
-          <div>
-            <div className="text-[14px] text-bone">{p.name}</div>
-            <div className="micro text-smoke flex items-center gap-2">
-              <span>{p.type}</span>
-              <span>·</span>
-              <span className="inline-flex items-center gap-1">
-                {r.status === "running" && (
-                  <span className="w-1.5 h-1.5 bg-brand rounded-full pulse-dot" />
+    <div className="card p-4 flex flex-col">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-2 pb-3 border-b border-ink-600">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <ProviderMark slug={r.slug} size={28} />
+          <div className="min-w-0">
+            <div className="text-[13px] text-bone truncate">{p.name}</div>
+            <div className="micro text-smoke flex items-center gap-1.5">
+              {r.status === "running" && (
+                <span className="w-1.5 h-1.5 bg-brand rounded-full pulse-dot" />
+              )}
+              {r.status === "completed" && stream.done && (
+                <span className="w-1.5 h-1.5 bg-brand rounded-full" />
+              )}
+              {r.status === "completed" && !stream.done && (
+                <span className="w-1.5 h-1.5 bg-brand rounded-full pulse-dot" />
+              )}
+              {r.status === "failed" && (
+                <span className="w-1.5 h-1.5 bg-coral rounded-full" />
+              )}
+              {(r.status === "cancelled" || r.status === "pending") && (
+                <span className="w-1.5 h-1.5 bg-smoke rounded-full" />
+              )}
+              <span
+                className={cx(
+                  r.status === "failed"
+                    ? "text-coral"
+                    : r.status === "cancelled"
+                      ? "text-smoke"
+                      : r.status === "completed"
+                        ? "text-ash"
+                        : "text-brand",
                 )}
-                {r.status === "completed" && stream.done && (
-                  <span className="w-1.5 h-1.5 bg-brand rounded-full" />
-                )}
-                {r.status === "failed" && (
-                  <span className="w-1.5 h-1.5 bg-coral rounded-full" />
-                )}
-                <span className={phaseTone}>
-                  {r.status === "completed" && !stream.done
-                    ? t("run.phaseStreaming")
-                    : phaseLabel}
-                </span>
+              >
+                {r.status === "completed" && !stream.done
+                  ? t("run.phaseStreaming")
+                  : phaseLabel[r.status]}
               </span>
             </div>
           </div>
         </div>
-        <TrustBadge score={p.trust} size="lg" />
+        <TrustBadge score={p.trust} />
       </div>
 
-      <div className="flex-1 min-h-[280px] py-2">
+      {/* Body */}
+      <div className="py-3 flex-1 min-h-[140px]">
         {r.status === "pending" && (
-          <div className="micro text-smoke flex items-center gap-2">
-            <span className="w-1.5 h-1.5 bg-smoke rounded-full" />
-            {t("run.phaseQueued")}
-          </div>
+          <div className="text-[12px] text-smoke">{t("run.phaseQueued")}…</div>
         )}
         {r.status === "running" && (
-          <div className="space-y-2 text-[13px] text-ash">
-            <div className="micro text-brand flex items-center gap-2 mb-3">
-              <I.spin className="w-3 h-3 animate-spin" />{" "}
-              {t("run.connectingTo", { name: p.name })}
-            </div>
-            <div className="shimmer h-3 w-2/3"></div>
-            <div className="shimmer h-3 w-3/4"></div>
-            <div className="shimmer h-3 w-1/2"></div>
+          <div className="space-y-2">
+            <div className="shimmer h-2.5 w-3/4" />
+            <div className="shimmer h-2.5 w-5/6" />
+            <div className="shimmer h-2.5 w-1/2" />
+          </div>
+        )}
+        {r.status === "cancelled" && (
+          <div className="text-smoke text-[12px]">
+            <I.x className="w-3.5 h-3.5 inline mr-1" />
+            {t("run.phaseCancelled")}
           </div>
         )}
         {r.status === "failed" && (
-          <div className="text-coral text-[13px]">
-            <I.x className="w-4 h-4 inline mr-1" />
+          <div className="text-coral text-[12px]">
+            <I.x className="w-3.5 h-3.5 inline mr-1" />
             {t("run.failedPrefix")}
             {r.error}
           </div>
         )}
-        {r.status === "completed" && (
-          <pre className="whitespace-pre-wrap text-[13px] leading-relaxed text-bone font-mono overflow-y-auto pr-2">
-            {stream.shown}
-            {!stream.done && (
-              <span className="inline-block w-2 h-4 bg-brand ml-0.5 align-middle pulse-dot" />
-            )}
-          </pre>
-        )}
-      </div>
-
-      <div className="mt-4 pt-4 border-t border-ink-600 flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-6 overflow-x-auto no-scroll-x">
-          <Stat label={t("run.colCost")} value={r.cost != null ? fmtUSD(r.cost, 4) : "—"} />
-          <Stat
-            label={t("run.colLatency")}
-            value={r.latency != null ? r.latency.toFixed(2) + "s" : "—"}
-          />
-          <Stat
-            label={t("run.colTtft")}
-            value={r.ttft != null ? (r.ttft * 1000).toFixed(0) + "ms" : "—"}
-          />
-          <Stat
-            label={t("run.colTokens")}
-            value={r.outputTokens ? `${r.inputTokens} / ${r.outputTokens}` : "—"}
-          />
-          <Stat label={t("run.colTrust")} value={String(p.trust)} />
-        </div>
-        <button
-          onClick={onPay}
-          disabled={r.status !== "completed"}
-          className="btn-brand px-4 py-2 text-[12px] font-medium inline-flex items-center gap-2 disabled:opacity-40"
-        >
-          <I.wallet className="w-4 h-4" /> {t("run.runWithWallet")}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="shrink-0">
-      <div className="micro text-smoke">{label}</div>
-      <div className="num text-bone text-[14px] mt-1">{value}</div>
-    </div>
-  );
-}
-
-function RunStatusList({
-  run,
-  onRetry,
-}: {
-  run: RunState;
-  onRetry: (slug: string) => void;
-}) {
-  const { t } = useLang();
-  const { providers } = useData();
-  const allDone = run.providers.every(
-    (r) => r.status === "completed" || r.status === "failed",
-  );
-  const completedCount = run.providers.filter((r) => r.status === "completed").length;
-  const failedCount = run.providers.filter((r) => r.status === "failed").length;
-  const benchKey = run.benchmark || "default";
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <div className="micro text-smoke">
-            {t("run.runIdLabel")}
-            <span className="num">{run.id}</span> ·{" "}
-            <span className="text-ash">
-              {t("run.benchDetected." + benchKey)}
-            </span>
-          </div>
-          <div className="serif text-2xl tracking-editorial mt-1">
-            {allDone ? (
-              <>
-                {t("run.compareComplete")}{" "}
-                <span className="serif-it text-brand">{t("run.compareCompleteIt")}</span>
-              </>
-            ) : (
-              <>
-                {t("run.runningCompare")}
-                <span className="serif-it text-brand">.</span>
-              </>
-            )}
-          </div>
-        </div>
-        <div className="text-right">
-          <div className="micro text-smoke">
-            {t("run.compareCompletedFraction", { c: completedCount, t: run.providers.length })}
-          </div>
-          {failedCount > 0 && (
-            <div className="micro text-coral mt-0.5">
-              {t("run.compareFailedCount", { n: failedCount })}
+        {r.status === "completed" &&
+          (stream.done ? (
+            <MarkdownBody text={stream.shown} />
+          ) : (
+            <div className="whitespace-pre-wrap text-[12.5px] leading-[1.55] text-bone">
+              {stream.shown}
+              <span className="inline-block w-1.5 h-3.5 bg-brand ml-0.5 align-middle pulse-dot" />
             </div>
+          ))}
+      </div>
+
+      {/* Footer */}
+      <div className="mt-2 pt-3 border-t border-ink-600 flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-3 text-[11px] num text-ash overflow-x-auto no-scroll-x">
+          {r.ttft != null && (
+            <span title={t("run.colTtft")}>{(r.ttft * 1000) | 0}ms</span>
+          )}
+          {r.latency != null && (
+            <span title={t("run.colLatency")}>{r.latency.toFixed(2)}s</span>
+          )}
+          {r.cost != null && (
+            <span title={t("run.colCost")}>{fmtUSD(r.cost, 4)}</span>
+          )}
+          {r.outputTokens != null && (
+            <span title={t("run.colTokens")}>
+              {r.inputTokens}/{r.outputTokens}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1">
+          {r.status === "completed" && (
+            <Fragment>
+              <button
+                onClick={() => onThumb(turnId, r.slug, "up")}
+                title={t("run.thumbUpTip")}
+                className={cx(
+                  "p-1.5 transition-colors",
+                  r.thumb === "up" ? "text-brand" : "text-smoke hover:text-bone",
+                )}
+              >
+                <IconThumbUp className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => onThumb(turnId, r.slug, "down")}
+                title={t("run.thumbDownTip")}
+                className={cx(
+                  "p-1.5 transition-colors",
+                  r.thumb === "down" ? "text-coral" : "text-smoke hover:text-bone",
+                )}
+              >
+                <IconThumbDown className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={onCopy}
+                title={t("run.copyResponse")}
+                className="text-smoke hover:text-bone p-1.5 transition-colors"
+              >
+                <I.copy className="w-3.5 h-3.5" />
+              </button>
+            </Fragment>
+          )}
+          {r.status === "failed" && (
+            <button
+              onClick={() => onRetry(turnId, r.slug)}
+              title={t("run.retryThis")}
+              className="px-2 py-1 text-[11px] border border-ink-600 hover:border-bone/40 text-ash hover:text-bone inline-flex items-center gap-1 transition-colors"
+            >
+              <I.refresh className="w-3 h-3" /> {t("run.retry")}
+            </button>
           )}
         </div>
       </div>
-      <div className="space-y-2">
-        {run.providers.map((r) => {
-          const provider = providers.find((p) => p.slug === r.slug)!;
-          const ic =
-            r.status === "pending" ? (
-              <span className="text-smoke">○</span>
-            ) : r.status === "running" ? (
-              <I.spin className="w-3.5 h-3.5 text-brand animate-spin" />
-            ) : r.status === "completed" ? (
-              <I.check className="w-3.5 h-3.5 text-brand" />
-            ) : (
-              <I.x className="w-3.5 h-3.5 text-coral" />
-            );
-          return (
-            <div
-              key={r.slug}
-              className={cx(
-                "flex items-center gap-4 px-4 py-3 border transition-colors",
-                r.status === "running"
-                  ? "border-brand/40"
-                  : r.status === "failed"
-                    ? "border-coral/30"
-                    : "border-ink-600",
-              )}
-            >
-              <div className="w-5 flex items-center justify-center">{ic}</div>
-              <ProviderMark slug={r.slug} />
-              <div className="flex-1">
-                <div className="text-[13px] text-bone">{provider.name}</div>
-                <div className="micro text-smoke">
-                  {r.status === "pending" && t("run.phaseQueuedShort")}
-                  {r.status === "running" && t("run.phaseStreamingShort")}
-                  {r.status === "completed" &&
-                    r.latency &&
-                    r.ttft &&
-                    t("run.returnedIn", {
-                      l: r.latency.toFixed(2),
-                      ms: (r.ttft * 1000).toFixed(0),
-                    })}
-                  {r.status === "failed" && r.error}
-                </div>
-              </div>
-              {r.status === "completed" && (
-                <div className="text-right num text-[12px]">
-                  <div className="text-bone">{fmtUSD(r.cost!, 4)}</div>
-                  <div className="text-smoke text-[11px]">{r.outputTokens} out</div>
-                </div>
-              )}
-              {r.status === "running" && (
-                <div className="w-24 h-px bg-ink-500 relative overflow-hidden shimmer"></div>
-              )}
-              {r.status === "failed" && (
-                <button
-                  onClick={() => onRetry(r.slug)}
-                  className="text-[11px] text-ash hover:text-bone inline-flex items-center gap-1.5 px-2.5 py-1 border border-ink-500 hover:border-bone transition-colors"
-                >
-                  <I.refresh className="w-3 h-3" /> {t("run.retry")}
-                </button>
-              )}
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 }
 
-function SummaryCards({ run }: { run: RunState }) {
-  const { t } = useLang();
-  const { providers } = useData();
-  const completed = run.providers.filter((r) => r.status === "completed" && r.scores);
-  if (!completed.length) return null;
+// ─── ComposeBox ───────────────────────────────────────────────────────────────
 
-  const cheapest = [...completed].sort((a, b) => (a.cost! - b.cost!))[0];
-  const fastest = [...completed].sort((a, b) => (a.latency! - b.latency!))[0];
-  const trusted = [...completed].sort((a, b) => {
-    const tA = providers.find((p) => p.slug === a.slug)!.trust;
-    const tB = providers.find((p) => p.slug === b.slug)!.trust;
-    return tB - tA;
-  })[0];
-  const recommended = [...completed].sort(
-    (a, b) => (b.scores!.overall - a.scores!.overall),
-  )[0];
-
-  const recProvider = providers.find((p) => p.slug === recommended.slug)!;
-  const cheapProvider = providers.find((p) => p.slug === cheapest.slug)!;
-  const fastProvider = providers.find((p) => p.slug === fastest.slug)!;
-  const trustProvider = providers.find((p) => p.slug === trusted.slug)!;
-
-  const avgCost = completed.reduce((s, c) => s + c.cost!, 0) / completed.length;
-  const cheapPct = Math.round((avgCost / cheapest.cost! - 1) * 100);
-
-  return (
-    <div>
-      <div className="micro text-smoke mb-3">
-        {t("run.verdictRouters", { n: completed.length })}
-      </div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-ink-600">
-        <SumCard
-          tag={t("run.sumCheapest")}
-          name={cheapProvider.name}
-          value={fmtUSD(cheapest.cost!, 4)}
-          sub={t("run.sumCheapVsAvg", { pct: cheapPct })}
-          tone="brand"
-          slug={cheapest.slug}
-        />
-        <SumCard
-          tag={t("run.sumFastest")}
-          name={fastProvider.name}
-          value={`${fastest.latency!.toFixed(2)}s`}
-          sub={t("run.sumTtftMs", { ms: (fastest.ttft! * 1000).toFixed(0) })}
-          tone="sky"
-          slug={fastest.slug}
-        />
-        <SumCard
-          tag={t("run.sumMostTrusted")}
-          name={trustProvider.name}
-          value={String(trustProvider.trust)}
-          sub={trustLabel(trustProvider.trust)}
-          tone={trustTone(trustProvider.trust)}
-          slug={trusted.slug}
-        />
-        <SumCard
-          tag={t("run.sumRecommended")}
-          name={recProvider.name}
-          value={String(recommended.scores!.overall)}
-          sub={t("run.sumBestBalance")}
-          tone="brand"
-          slug={recommended.slug}
-          highlight
-        />
-      </div>
-    </div>
-  );
-}
-
-function SumCard({
-  tag,
-  name,
-  value,
-  sub,
-  tone,
-  slug,
-  highlight = false,
-}: {
-  tag: string;
-  name: string;
+interface ComposeBoxProps {
   value: string;
-  sub: string;
-  tone: "brand" | "sky" | "amber" | "coral";
-  slug: string;
-  highlight?: boolean;
-}) {
-  const tColor = (
-    { brand: "text-brand", sky: "text-sky", amber: "text-amber", coral: "text-coral" } as Record<typeof tone, string>
-  )[tone];
-  return (
-    <div className={cx("p-6 bg-ink", highlight && "ring-1 ring-brand")}>
-      <div className="flex items-center justify-between">
-        <div className="micro text-smoke">{tag}</div>
-        <ProviderMark slug={slug} />
-      </div>
-      <div className="mt-4">
-        <div className="text-[13px] text-ash">{name}</div>
-        <div className={cx("serif text-5xl mt-1 tracking-editorial", tColor)}>
-          {value}
-        </div>
-        <div className="text-[11px] text-smoke mt-1">{sub}</div>
-      </div>
-    </div>
-  );
+  onChange: (v: string) => void;
+  onSubmit: () => void;
+  onStop: () => void;
+  inFlight: boolean;
+  disabled: boolean;
+  disabledReason: string | null;
+  inputRef: React.RefObject<HTMLTextAreaElement | null>;
+  providerCount: number;
+  t: (key: string, vars?: Record<string, string | number>) => string;
 }
 
-function ResponseGrid({ run }: { run: RunState }) {
-  const { t } = useLang();
-  const { providers } = useData();
-  const visible = run.providers.filter(
-    (r) => r.status === "completed" || r.status === "failed",
-  );
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [payTarget, setPayTarget] = useState<{ provider: Provider; cost: number } | null>(null);
-  const toast = useToast();
-  const { wallet, setShowConnect } = useWallet();
-  const colCount = Math.min(visible.length, 4);
-  const colCls =
-    colCount === 1
-      ? "md:grid-cols-1"
-      : colCount === 2
-        ? "md:grid-cols-2"
-        : colCount === 3
-          ? "md:grid-cols-3 xl:grid-cols-3"
-          : "md:grid-cols-2 xl:grid-cols-4";
+function ComposeBox({
+  value,
+  onChange,
+  onSubmit,
+  onStop,
+  inFlight,
+  disabled,
+  disabledReason,
+  inputRef,
+  providerCount,
+  t,
+}: ComposeBoxProps) {
+  const localRef = useRef<HTMLTextAreaElement | null>(null);
+  const textareaRef = inputRef || localRef;
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 180) + "px";
+  }, [value, textareaRef]);
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+      e.preventDefault();
+      if (!inFlight) onSubmit();
+    }
+  };
+
+  const placeholder = t("run.composePlaceholder", {
+    n: providerCount,
+    s: providerCount === 1 ? "" : "s",
+  });
+
+  const canSend = !disabled && !inFlight && value.trim().length > 0;
 
   return (
     <div>
-      <div className="micro text-smoke mb-3">{t("run.sideBySide")}</div>
-      <div className={cx("grid grid-cols-1 gap-px bg-ink-600", colCls)}>
-        {visible.map((r) => {
-          const p = providers.find((x) => x.slug === r.slug)!;
-          const isExpanded = !!expanded[r.slug];
-          return (
-            <div key={r.slug} className="bg-ink p-5 flex flex-col">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <ProviderMark slug={r.slug} />
-                  <div>
-                    <div className="text-[13px] text-bone">{p.name}</div>
-                    <div className="micro text-smoke">{p.type}</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1">
-                  {r.response && (
-                    <>
-                      <button
-                        onClick={() => {
-                          copyToClipboard(r.response!);
-                          toast.show(t("run.copiedResponse", { name: p.name }));
-                        }}
-                        title={t("run.copyResponse")}
-                        className="text-smoke hover:text-bone p-1"
-                      >
-                        <I.copy className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() =>
-                          setExpanded((s) => ({ ...s, [r.slug]: !s[r.slug] }))
-                        }
-                        title={isExpanded ? t("run.collapse") : t("run.expand")}
-                        className="text-smoke hover:text-bone p-1 text-[10px] num"
-                      >
-                        {isExpanded ? "−" : "+"}
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-2 py-3 border-y border-ink-600 text-[11px]">
-                <div>
-                  <div className="micro text-smoke mb-1">{t("run.colCost")}</div>
-                  <div className="num text-bone">
-                    {r.cost != null ? fmtUSD(r.cost, 4) : "—"}
-                  </div>
-                </div>
-                <div>
-                  <div className="micro text-smoke mb-1">{t("run.colLatency")}</div>
-                  <div className="num text-bone">
-                    {r.latency != null ? r.latency.toFixed(2) + "s" : "—"}
-                  </div>
-                </div>
-                <div>
-                  <div className="micro text-smoke mb-1">{t("run.colTokens")}</div>
-                  <div className="num text-bone">{r.outputTokens || "—"}</div>
-                </div>
-              </div>
-              <div
-                className={cx(
-                  "mt-3 flex-1 text-[12px] leading-relaxed text-ash whitespace-pre-wrap font-mono overflow-y-auto pr-2",
-                  isExpanded ? "" : "max-h-[260px] gradient-mask-bottom",
-                )}
-              >
-                {r.status === "failed" ? (
-                  <div className="text-coral">
-                    <I.x className="w-4 h-4 inline mb-1 mr-1" />
-                    {t("run.failedPrefix")}
-                    {r.error}
-                  </div>
-                ) : (
-                  r.response
-                )}
-              </div>
-              <div className="mt-3 pt-3 border-t border-ink-600 flex items-center justify-between">
-                <TrustBadge score={p.trust} />
-                {r.status === "completed" ? (
-                  <button
-                    onClick={() =>
-                      wallet
-                        ? setPayTarget({ provider: p, cost: r.cost! })
-                        : setShowConnect(true)
-                    }
-                    className="btn-brand px-3 py-1 text-[11px] font-medium inline-flex items-center gap-1"
-                  >
-                    <I.wallet className="w-3 h-3" /> {t("run.useThis")}
-                  </button>
-                ) : (
-                  <span className="text-[10px] text-coral micro">
-                    {t("run.phaseFailed")}
-                  </span>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      {payTarget && (
-        <PaymentModal
-          provider={payTarget.provider}
-          cost={payTarget.cost}
-          onClose={() => setPayTarget(null)}
-        />
-      )}
-    </div>
-  );
-}
-
-function EvaluationTable({ run }: { run: RunState }) {
-  const { t } = useLang();
-  const { providers } = useData();
-  const completed = run.providers.filter((r) => r.status === "completed" && r.scores);
-  if (!completed.length) return null;
-  const rows = [...completed]
-    .map((r) => ({ ...r, p: providers.find((x) => x.slug === r.slug)! }))
-    .sort((a, b) => b.scores!.overall - a.scores!.overall);
-  const winner = rows[0];
-
-  return (
-    <div>
-      <div className="micro text-smoke mb-3">{t("run.scorecardLabel")}</div>
-      <div className="border border-ink-600 overflow-x-auto">
-        <div className="min-w-[640px]">
-          <div className="grid grid-cols-[2fr_repeat(4,_1fr)_80px] px-5 py-3 micro text-smoke border-b border-ink-600 bg-ink-800/30">
-            <div>{t("run.scoProvider")}</div>
-            <div className="text-right">{t("run.scoL1")}</div>
-            <div className="text-right">{t("run.scoL3")}</div>
-            <div className="text-right">{t("run.scoL2")}</div>
-            <div className="text-right">{t("run.scoOverall")}</div>
-            <div className="text-right">{t("run.scoTier")}</div>
-          </div>
-          {rows.map((r) => (
-            <div
-              key={r.slug}
-              className={cx(
-                "grid grid-cols-[2fr_repeat(4,_1fr)_80px] px-5 py-4 items-center border-b border-ink-600 last:border-0",
-                r.slug === winner.slug && "bg-brand/5",
-              )}
-            >
-              <div className="flex items-center gap-3">
-                <ProviderMark slug={r.slug} />
-                <span className="text-bone text-[13px]">{r.p.name}</span>
-                {r.slug === winner.slug && (
-                  <span className="micro text-brand">{t("run.scoBest")}</span>
-                )}
-              </div>
-              <ScoreCell value={r.scores!.L1} />
-              <ScoreCell value={r.scores!.L3} />
-              <ScoreCell value={r.scores!.L2} />
-              <ScoreCell value={r.scores!.overall} bold />
-              <div className="text-right">
-                <TierChip tier={r.scores!.tier as Tier} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="mt-3 text-[11px] text-smoke leading-relaxed max-w-3xl">
-        {t("run.scoMethodologyNote")}{" "}
-        <Link href="/docs" className="ulink text-ash">
-          {t("run.scoMethodology")}
-        </Link>
-        .
-      </div>
-    </div>
-  );
-}
-
-function ScoreCell({ value, bold = false }: { value: number; bold?: boolean }) {
-  const tone = value >= 88 ? "brand" : value >= 70 ? "amber" : "coral";
-  const colors = {
-    brand: "text-brand",
-    amber: "text-amber",
-    coral: "text-coral",
-  };
-  const bars = {
-    brand: "bg-brand",
-    amber: "bg-amber",
-    coral: "bg-coral",
-  };
-  return (
-    <div className="text-right">
-      <div className={cx("num", bold ? "text-base" : "text-[13px]", colors[tone])}>
-        {value}
-      </div>
       <div
-        className="mt-1 ml-auto h-px relative overflow-hidden bg-ink-500"
-        style={{ width: 80 }}
+        className={cx(
+          "relative bg-ink-800 border transition-colors",
+          disabled ? "border-ink-600" : "border-ink-500 focus-within:border-brand/60",
+        )}
       >
-        <div
-          className={cx(bars[tone], "absolute inset-y-0 right-0")}
-          style={{ width: `${value}%` }}
-        ></div>
-      </div>
-    </div>
-  );
-}
-
-function RecommendedAction({ run }: { run: RunState }) {
-  const { t } = useLang();
-  const { providers } = useData();
-  const { wallet, setShowConnect } = useWallet();
-  const [payTarget, setPayTarget] = useState<{ provider: Provider; cost: number } | null>(null);
-  const completed = run.providers.filter((r) => r.status === "completed" && r.scores);
-  if (!completed.length) return null;
-
-  const recommended = [...completed].sort(
-    (a, b) => b.scores!.overall - a.scores!.overall,
-  )[0];
-  const cheapest = [...completed].sort((a, b) => a.cost! - b.cost!)[0];
-  const trusted = [...completed].sort((a, b) => {
-    const tA = providers.find((p) => p.slug === a.slug)!.trust;
-    const tB = providers.find((p) => p.slug === b.slug)!.trust;
-    return tB - tA;
-  })[0];
-
-  const recP = providers.find((p) => p.slug === recommended.slug)!;
-  const cheapP = providers.find((p) => p.slug === cheapest.slug)!;
-  const trustP = providers.find((p) => p.slug === trusted.slug)!;
-
-  const pay = (provider: Provider, cost: number) => {
-    if (!wallet) setShowConnect(true);
-    else setPayTarget({ provider, cost });
-  };
-
-  const isSame = (p: Provider) => p.slug === recP.slug;
-
-  return (
-    <>
-      <div className="card-2 p-8 ring-1 ring-brand/30 relative overflow-hidden">
-        <div className="absolute top-0 left-0 right-0 h-px bg-brand"></div>
-        <div className="grid md:grid-cols-[1fr_auto] gap-8 items-end">
-          <div>
-            <div className="micro text-smoke">{t("run.verdict")}</div>
-            <h3 className="serif text-3xl sm:text-4xl lg:text-5xl tracking-editorial mt-2">
-              {t("run.useHeadline")}{" "}
-              <span className="serif-it text-brand">{recP.name}</span>.
-            </h3>
-            <p className="mt-3 text-ash text-[14px] max-w-xl leading-relaxed">
-              {t("run.useBody")}{" "}
-              <span className="num text-bone">{recommended.scores!.overall}</span>
-              {t("run.useEstCost")}{" "}
-              <span className="num text-bone">{fmtUSD(recommended.cost!, 4)}</span>
-              {t("run.useTrailer")}
-            </p>
-          </div>
-          <div className="flex flex-col gap-2 min-w-[260px]">
-            <button
-              onClick={() => pay(recP, recommended.cost!)}
-              className="btn-brand px-6 py-3 text-sm font-medium tracking-tight inline-flex items-center gap-2 justify-center"
-            >
-              <I.wallet className="w-4 h-4" />{" "}
-              {t("run.payAndRun", { name: recP.name })}
-            </button>
-            {!isSame(cheapP) && (
-              <button
-                onClick={() => pay(cheapP, cheapest.cost!)}
-                className="btn-ghost px-6 py-2 text-[12px] inline-flex items-center justify-between gap-3"
-              >
-                <span>{t("run.useCheapestPick", { name: cheapP.name })}</span>
-                <span className="num text-brand">{fmtUSD(cheapest.cost!, 4)}</span>
-              </button>
-            )}
-            {!isSame(trustP) && (
-              <button
-                onClick={() => pay(trustP, trusted.cost!)}
-                className="btn-ghost px-6 py-2 text-[12px] inline-flex items-center justify-between gap-3"
-              >
-                <span>{t("run.useTrustedPick", { name: trustP.name })}</span>
-                <span className="num text-amber">{trustP.trust}</span>
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-      {payTarget && (
-        <PaymentModal
-          provider={payTarget.provider}
-          cost={payTarget.cost}
-          onClose={() => setPayTarget(null)}
+        <textarea
+          ref={textareaRef}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={onKeyDown}
+          rows={1}
+          placeholder={placeholder}
+          disabled={disabled}
+          className="w-full bg-transparent outline-none px-4 py-3 pr-16 text-[13px] resize-none text-bone leading-relaxed disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{ minHeight: 52, maxHeight: 180 }}
         />
-      )}
-    </>
-  );
-}
-
-function RecentRuns({
-  history,
-  onClear,
-  onReuse,
-}: {
-  history: HistoryEntry[];
-  onClear: () => void;
-  onReuse: (h: HistoryEntry) => void;
-}) {
-  const { t } = useLang();
-  const { providers } = useData();
-  const toast = useToast();
-  return (
-    <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 mt-12">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <div className="micro text-smoke">{t("run.recentRuns")}</div>
-          <h3 className="serif text-3xl sm:text-4xl lg:text-5xl tracking-editorial mt-1">
-            {t("run.yourLast")}{" "}
-            <span className="serif-it text-brand">{history.length}</span>
-          </h3>
-        </div>
-        <button
-          onClick={onClear}
-          className="micro text-smoke hover:text-bone"
-        >
-          {t("run.clear")}
-        </button>
+        {inFlight ? (
+          <button
+            onClick={onStop}
+            aria-label={t("run.composeStop")}
+            title={t("run.composeStop")}
+            className="absolute bottom-2 right-2 w-9 h-9 flex items-center justify-center bg-coral text-ink transition-colors hover:opacity-90"
+          >
+            <span className="w-3 h-3 bg-ink block" />
+          </button>
+        ) : (
+          <button
+            onClick={onSubmit}
+            disabled={!canSend}
+            aria-label={t("run.composeSend")}
+            className={cx(
+              "absolute bottom-2 right-2 w-9 h-9 flex items-center justify-center transition-colors",
+              canSend ? "btn-brand" : "bg-ink-700 text-smoke cursor-not-allowed",
+            )}
+          >
+            <IconSend className="w-4 h-4" />
+          </button>
+        )}
       </div>
-      <div className="space-y-px bg-ink-600 border border-ink-600">
-        {history.map((h) => {
-          const completed = h.providers.filter((r) => r.status === "completed");
-          const totalCost = completed.reduce((s, r) => s + (r.cost || 0), 0);
-          const isCompare = h.providers.length > 1;
-          return (
-            <div
-              key={h.id}
-              className="bg-ink p-4 flex flex-col md:grid md:grid-cols-[200px_1fr_auto] gap-3 md:gap-4 md:items-center"
-            >
-              <div className="flex items-center gap-2">
-                <div className="flex -space-x-2">
-                  {h.providers.slice(0, 3).map((r) => (
-                    <div
-                      key={r.slug}
-                      className="ring-1 ring-ink rounded-sm"
-                    >
-                      <ProviderMark slug={r.slug} size={28} />
-                    </div>
-                  ))}
-                  {h.providers.length > 3 && (
-                    <div className="w-7 h-7 flex items-center justify-center bg-ink-700 text-ash text-[10px] num ring-1 ring-ink">
-                      +{h.providers.length - 3}
-                    </div>
-                  )}
-                </div>
-                <div className="ml-1">
-                  <div className="text-[13px] text-bone">
-                    {isCompare
-                      ? t("run.providersCount", { n: h.providers.length })
-                      : providers.find((p) => p.slug === h.providers[0].slug)?.name}
-                  </div>
-                  <div className="micro text-smoke">
-                    {isCompare ? t("run.modeCompare") : t("run.modeSingleShort")} ·{" "}
-                    {h.modelDisplay}
-                  </div>
-                </div>
-              </div>
-              <div className="text-[12px] text-ash line-clamp-2 md:truncate">
-                {h.prompt}
-              </div>
-              <div className="flex items-center justify-between md:justify-start gap-6">
-                <div className="text-left md:text-right">
-                  <div className="num text-[12px] text-bone">{fmtUSD(totalCost, 4)}</div>
-                  <div className="micro text-smoke">
-                    {t("run.okFraction", {
-                      c: completed.length,
-                      t: h.providers.length,
-                    })}
-                  </div>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => {
-                      const r = h.providers.find((rr) => rr.status === "completed");
-                      if (r?.response) {
-                        copyToClipboard(r.response);
-                        toast.show(t("run.responseCopied"));
-                      }
-                    }}
-                    title={t("run.copyFirst")}
-                    className="text-smoke hover:text-bone p-1.5"
-                  >
-                    <I.copy className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => onReuse(h)}
-                    title={t("run.reUse")}
-                    className="text-smoke hover:text-bone p-1.5"
-                  >
-                    <I.refresh className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
-        })}
+      <div className="mt-1.5 px-0.5 min-h-[14px] flex items-center justify-between gap-2">
+        <span className="micro text-smoke">
+          {disabledReason ||
+            (inFlight ? t("run.composeInFlightHint") : t("run.composeHotkeyHint"))}
+        </span>
       </div>
     </div>
   );

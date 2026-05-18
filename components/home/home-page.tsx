@@ -2,7 +2,6 @@
 
 import { useLang } from "@/lib/contexts/lang";
 import { Hero } from "./hero";
-import { TickerBar } from "./ticker-bar";
 import { RankingSection } from "./ranking-section";
 
 export function HomePage() {
@@ -11,7 +10,6 @@ export function HomePage() {
   return (
     <>
       <Hero />
-      <TickerBar />
       <RankingSection />
 
       {/* Insights rail */}
