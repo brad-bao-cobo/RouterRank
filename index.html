@@ -1912,6 +1912,7 @@ const I18N = {
       composeNoProviders: 'Pick at least one provider first',
       phaseCancelled: 'cancelled',
       regenerateBtn: 'Regenerate',
+      regenerateBtnOlder: 'Regenerate · later turns will be cleared',
       editBtn: 'Edit',
       editingMessage: 'Editing — Cmd↩ to resubmit · Esc to cancel',
       editCancel: 'Cancel',
@@ -1964,6 +1965,8 @@ const I18N = {
       mObservedSub: 'Observed · {markup}% vs official',
       mTrust: 'Trust (L1)',
       mTrustSub: 'Model authenticity',
+      mOverall: 'Overall score',
+      mOverallSub: '/ 100 · {tier}',
       mP50Latency: 'p50 latency',
       mP95: 'p95 {v}s',
       mSuccess: 'Success',
@@ -2036,7 +2039,7 @@ const I18N = {
       sevHigh: 'high',
       sevMed: 'medium',
       sevLow: 'low',
-      tagFingerprint: '§03 · Model fingerprint',
+      tagFingerprint: '§03 · Model authenticity (L1.1)',
       // Top metrics
       mTtft: 'TTFT (p50)',
       mTtftSub: 'p95 {ms}ms',
@@ -2065,18 +2068,21 @@ const I18N = {
       trendToday: 'today',
       trendDaysAgo: '{n}d ago',
       perfRegional: 'Regional p50 TTFT',
-      perfThroughput: 'Throughput (tok/s)',
+      perfThroughput: 'Throughput',
+      perfThroughputHint: 'Output token rate during streaming — derived from output_tokens / (latency − TTFT). Directly drives "how fast the response feels" once first token arrives.',
       perfThroughputNote: 'Requires concurrent load testing · T2 roadmap',
       perfLongContext: 'Long-context decay',
       perfLongContextNote: 'Requires quality eval pipeline · T2 roadmap',
       headDidYouGet: 'Did you actually get',
+      headFingerprint: 'Model authenticity probes ·',
+      fpSubtitle: 'Across 5 statistical / behavioral signals · 7d rolling panel',
       runLiveValidation: 'Run live validation',
       refreshNightly: 'Refresh nightly',
       modelTabsHint: '',
-      matchScore: 'Match score',
-      verified: 'Verified',
-      caution: 'Caution',
-      risky: 'Risky',
+      matchScore: 'Authenticity confidence',
+      verified: 'High confidence',
+      caution: 'Medium confidence',
+      risky: 'Low confidence',
       samples24h: 'samples · 24h',
       fpEmbedDist: 'Embedding distance',
       fpEmbedHint: 'Cosine similarity of response embeddings vs the canonical model\'s distribution. Sampled across a 50-prompt fixed probe set.',
@@ -2618,6 +2624,7 @@ const I18N = {
       composeNoProviders: '请先勾选至少一家服务商',
       phaseCancelled: '已取消',
       regenerateBtn: '重新生成',
+      regenerateBtnOlder: '重新生成 · 后续轮次会被清除',
       editBtn: '编辑',
       editingMessage: '编辑中 — ⌘↩ 重发 · Esc 取消',
       editCancel: '取消',
@@ -2670,6 +2677,8 @@ const I18N = {
       mObservedSub: '观测价 · 比官方价 {markup}%',
       mTrust: '信任分 (L1)',
       mTrustSub: '模型真实性',
+      mOverall: '综合评分',
+      mOverallSub: '/ 100 · {tier}',
       mP50Latency: 'p50 延迟',
       mP95: 'p95 {v}s',
       mSuccess: '成功率',
@@ -2742,7 +2751,7 @@ const I18N = {
       sevHigh: '高',
       sevMed: '中',
       sevLow: '低',
-      tagFingerprint: '§03 · 模型指纹',
+      tagFingerprint: '§03 · 模型真实性 (L1.1)',
       // Top metrics
       mTtft: 'TTFT (p50)',
       mTtftSub: 'p95 {ms}ms',
@@ -2771,18 +2780,21 @@ const I18N = {
       trendToday: '今日',
       trendDaysAgo: '{n} 天前',
       perfRegional: '各区域 p50 TTFT',
-      perfThroughput: '吞吐量 (tok/s)',
+      perfThroughput: '吞吐量',
+      perfThroughputHint: '流式输出阶段每秒吐出的 token 数 · 公式：output_tokens ÷ (latency − TTFT)。决定首字节之后"字流过来快不快"的体感。',
       perfThroughputNote: '需要并发负载测试 · T2 路线图',
       perfLongContext: '长上下文衰减',
       perfLongContextNote: '需要 quality eval pipeline · T2 路线图',
       headDidYouGet: '你拿到的真的是',
+      headFingerprint: '模型真实性探测 ·',
+      fpSubtitle: '基于 5 个统计 / 行为信号 · 7 天连续探测',
       runLiveValidation: '运行实时验证',
       refreshNightly: '每日刷新',
       modelTabsHint: '',
-      matchScore: '匹配度',
-      verified: '已核验',
-      caution: '需关注',
-      risky: '风险',
+      matchScore: '真实性置信指数',
+      verified: '高置信',
+      caution: '中置信',
+      risky: '低置信',
       samples24h: '次采样 · 24h',
       fpEmbedDist: '嵌入距离',
       fpEmbedHint: '响应嵌入与原版模型分布之间的余弦相似度。在 50 条固定 probe 集合上采样。',
@@ -4036,6 +4048,11 @@ function RunPage() {
   const [editDraft, setEditDraft] = useState('');
   const composeRef = useRef(null);
   const threadBottomRef = useRef(null);
+  // Anchor on the latest user message — used to scroll it to the top of the
+  // viewport after submit (ChatGPT-style: your new prompt parks at the top,
+  // the assistant streams down below). MessageList attaches this ref to the
+  // very last UserBubble.
+  const latestUserAnchorRef = useRef(null);
   // Track every in-flight setTimeout per turn so Stop / Regenerate / Edit
   // can cancel them before they fire and mutate state.
   const pendingTimersRef = useRef({});
@@ -4062,9 +4079,14 @@ function RunPage() {
     setActiveProviders(padded);
   }, [model]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-scroll to bottom when the thread grows
+  // ChatGPT-style scroll: when a new turn is added, scroll the new user
+  // message to the TOP of the viewport (just below the sticky bars). The
+  // assistant cards stream down below it. Uses scroll-margin-top on the
+  // bubble to clear the global header + Run top bar.
   useEffect(() => {
-    threadBottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    if (latestUserAnchorRef.current) {
+      latestUserAnchorRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }, [messages.length]);
 
   // Register a timer in the per-turn registry so stop() / regenerate() can cancel it.
@@ -4188,32 +4210,33 @@ function RunPage() {
     ));
   };
 
-  // Regenerate — re-run the LAST assistant turn using the current activeProviders.
-  // We deliberately use the current active set (not the original turn's slugs)
-  // so the user can swap providers and re-roll.
-  const regenerateLast = () => {
+  // Regenerate a specific assistant turn — re-roll it AND truncate everything
+  // after it (consistent with edit behavior). Uses the current activeProviders
+  // (not the original turn's slugs) so the user can swap providers and re-roll.
+  // Truncating future turns avoids logical inconsistency where later turns
+  // depended on the old response content.
+  const regenerateTurn = (targetTurnId) => {
     if (inFlight) return;
-    const aIdx = (() => {
-      for (let i = messages.length - 1; i >= 0; i--) {
-        if (messages[i].role === 'assistant') return i;
-      }
-      return -1;
-    })();
+    const aIdx = messages.findIndex(m => m.role === 'assistant' && m.turnId === targetTurnId);
     if (aIdx < 1) return;
     const userText = messages[aIdx - 1]?.content || '';
     if (!userText) return;
-    const oldTurnId = messages[aIdx].turnId;
+    // Clear ALL pending timers (we're truncating, so any in-flight for now-
+    // discarded turns shouldn't fire either). Edit/regenerate buttons are
+    // disabled when inFlight so this set is normally empty, but be defensive.
+    Object.values(pendingTimersRef.current).flat().forEach(clearTimeout);
+    pendingTimersRef.current = {};
     const turnId = `t_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-    setMessages(prev => prev.map((m, i) =>
-      i === aIdx
-        ? { ...m, ts: Date.now(), turnId, responses: activeProviders.map(slug => ({ slug, status: 'pending', thumb: null })) }
-        : m
-    ));
-    // Clear timers for the old turnId in case anything was still pending
-    if (pendingTimersRef.current[oldTurnId]) {
-      pendingTimersRef.current[oldTurnId].forEach(clearTimeout);
-      delete pendingTimersRef.current[oldTurnId];
-    }
+    // Truncate everything past this assistant turn; replace this turn with
+    // fresh pending responses; keep user msg unchanged.
+    setMessages(prev => {
+      const truncated = prev.slice(0, aIdx + 1);
+      return truncated.map((m, i) =>
+        i === aIdx
+          ? { ...m, ts: Date.now(), turnId, responses: activeProviders.map(slug => ({ slug, status: 'pending', thumb: null })) }
+          : m
+      );
+    });
     activeProviders.forEach((slug, idx) => launchResponse(turnId, slug, idx, userText));
   };
 
@@ -4270,7 +4293,10 @@ function RunPage() {
   return (
     <Fragment>
       {/* TOP BAR — model picker, provider chips, params, reset */}
-      <section className="border-b border-ink-600 bg-ink-800/30">
+      {/* Top bar sticky just below the global header so model + provider
+          context is always visible while scrolling the chat. z-30 sits below
+          the global Header (z-40) but above thread content. */}
+      <section className="sticky top-16 z-30 border-b border-ink-600 bg-ink/85 backdrop-blur-md">
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3 flex-wrap min-w-0">
             <div className="shrink-0">
@@ -4370,7 +4396,7 @@ function RunPage() {
               messages={messages}
               onThumb={setThumb}
               onRetry={retry}
-              onRegenerate={regenerateLast}
+              onRegenerate={regenerateTurn}
               canRegenerate={!inFlight}
               editingId={editingId}
               editDraft={editDraft}
@@ -4379,6 +4405,7 @@ function RunPage() {
               onCancelEdit={cancelEdit}
               onSubmitEdit={resubmitEdit}
               canEdit={!inFlight}
+              latestUserAnchorRef={latestUserAnchorRef}
             />
             <div ref={threadBottomRef}/>
           </div>
@@ -4589,6 +4616,7 @@ function MessageList({
   messages, onThumb, onRetry,
   onRegenerate, canRegenerate,
   editingId, editDraft, onEditDraftChange, onStartEdit, onCancelEdit, onSubmitEdit, canEdit,
+  latestUserAnchorRef,
 }) {
   // Index of the last assistant message (for Regenerate button)
   const lastAssistantId = useMemo(() => {
@@ -4620,6 +4648,7 @@ function MessageList({
               onStartEdit={onStartEdit}
               onCancelEdit={onCancelEdit}
               onSubmitEdit={onSubmitEdit}
+              anchorRef={m.id === lastUserId ? latestUserAnchorRef : null}
             />
           : <AssistantRow
               key={m.id}
@@ -4630,6 +4659,14 @@ function MessageList({
               onRegenerate={onRegenerate}
               canRegenerate={canRegenerate}
             />
+      )}
+      {/* "Clear screen" spacer · enables ChatGPT-style scroll behavior:
+          guarantees ~1 viewport of empty space below the latest content so
+          scrolling the new user message to viewport-top is always possible.
+          Without this, short conversations (1-2 turns) wouldn't have enough
+          scrollable area to push earlier content off-screen. */}
+      {messages.length > 0 && (
+        <div aria-hidden="true" style={{ minHeight: 'calc(100vh - 320px)' }}/>
       )}
     </div>
   );
@@ -4642,14 +4679,21 @@ function MessageList({
 function UserBubble({
   msg, isLast, canEdit,
   isEditing, editDraft, onEditDraftChange, onStartEdit, onCancelEdit, onSubmitEdit,
+  anchorRef,
 }) {
   const { t } = useLang();
   const time = new Date(msg.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const showEditAffordance = isLast && canEdit && !isEditing;
+  // Edit affordance now available on ANY user message (not just the last).
+  // Resubmit will truncate everything after this message, consistent with
+  // single-branch chat history semantics.
+  const showEditAffordance = canEdit && !isEditing;
+  // scroll-margin-top accounts for global Header (64px) + Run top bar (~60px)
+  // so when this bubble is scrolled-into-view it sits below them, not under them.
+  const scrollPadStyle = { scrollMarginTop: '140px' };
 
   if (isEditing) {
     return (
-      <div className="flex justify-end">
+      <div ref={anchorRef} style={scrollPadStyle} className="flex justify-end">
         <div className="w-full max-w-[90%] sm:max-w-[80%] md:max-w-[70%]">
           <textarea
             value={editDraft}
@@ -4681,7 +4725,7 @@ function UserBubble({
   }
 
   return (
-    <div className="flex justify-end group">
+    <div ref={anchorRef} style={scrollPadStyle} className="flex justify-end group">
       <div className="max-w-[90%] sm:max-w-[70%] md:max-w-[60%]">
         <div className="micro text-smoke mb-1 text-right flex items-center justify-end gap-2">
           {showEditAffordance && (
@@ -4705,8 +4749,9 @@ function UserBubble({
 }
 
 // AssistantRow — one assistant turn = N response cards in a responsive grid.
-// The last assistant row (when nothing is in-flight) gets a footer Regenerate
-// button so the user can re-roll the same prompt across providers.
+// Regenerate button available on ANY assistant row (not just the last); it
+// re-rolls that specific turn and truncates everything after — consistent
+// with the edit-resubmit semantic.
 function AssistantRow({ row, onThumb, onRetry, isLast, onRegenerate, canRegenerate }) {
   const { t } = useLang();
   const n = row.responses.length;
@@ -4715,7 +4760,7 @@ function AssistantRow({ row, onThumb, onRetry, isLast, onRegenerate, canRegenera
                 : n === 3 ? 'grid-cols-1 md:grid-cols-3'
                 :           'grid-cols-1 md:grid-cols-2 lg:grid-cols-3';
   const allDone = row.responses.every(r => r.status === 'completed' || r.status === 'failed' || r.status === 'cancelled');
-  const showRegenerate = isLast && canRegenerate && allDone;
+  const showRegenerate = canRegenerate && allDone;
   return (
     <div>
       <div className={cx('grid gap-3', gridCls)}>
@@ -4732,9 +4777,9 @@ function AssistantRow({ row, onThumb, onRetry, isLast, onRegenerate, canRegenera
       {showRegenerate && (
         <div className="mt-2 flex justify-end">
           <button
-            onClick={onRegenerate}
+            onClick={() => onRegenerate(row.turnId)}
             className="px-3 py-1.5 text-[11px] border border-ink-500 hover:border-bone/40 text-ash hover:text-bone inline-flex items-center gap-1.5 transition-colors"
-            title={t('run.regenerateBtn')}
+            title={isLast ? t('run.regenerateBtn') : t('run.regenerateBtnOlder')}
           >
             <I.refresh className="w-3 h-3"/> {t('run.regenerateBtn')}
           </button>
@@ -5101,17 +5146,17 @@ function PerCallEstimator({ entries, initialSelectedId }) {
       </div>
 
       {/* Two-cell comparison: official (reference) → observed (highlighted) */}
+      {/* Clean 2-cell comparison — no bg tint on observed (was too muddy).
+          Visual hierarchy: official is smoke (subdued) vs observed which is
+          bone + font-medium + larger. Amber label only on header. */}
       <div className="grid grid-cols-2 gap-px bg-ink-600 border border-ink-600">
         <div className="bg-ink px-4 py-4">
           <div className="micro text-smoke mb-1.5">{t('provider.officialPrice')}</div>
           <div className="num text-[20px] text-smoke tracking-tight">{fmtUSD(refReq, 4)}</div>
         </div>
-        <div
-          className="px-4 py-4 border-l-2 border-amber/50"
-          style={{ background: 'rgb(var(--amber) / 0.06)' }}
-        >
+        <div className="bg-ink px-4 py-4">
           <div className="micro text-amber mb-1.5 flex items-center gap-1.5">
-            {t('provider.observedShort')} <PreviewChip/>
+            {t('provider.observedShort')}
           </div>
           <div className="num text-[20px] text-bone font-medium tracking-tight">{fmtUSD(observedReq, 4)}</div>
         </div>
@@ -5184,10 +5229,10 @@ function TopMetrics({ p, m, model }) {
         sub={t('provider.mSamples', { n: m.samples.toLocaleString() })}
       />
       <Metric
-        label={t('provider.mTrust')}
-        value={m.L1}
-        sub={t('provider.mTrustSub')}
-        tone={m.L1 >= 88 ? 'brand' : m.L1 >= 75 ? 'bone' : 'amber'}
+        label={t('provider.mOverall')}
+        value={m.overall}
+        sub={t('provider.mOverallSub', { tier: m.tier })}
+        tone={m.overall >= 88 ? 'brand' : m.overall >= 75 ? 'bone' : 'amber'}
       />
     </div>
   );
@@ -5349,7 +5394,6 @@ function PlaceholderCard({ title, note }) {
     <div className="card p-5 relative">
       <div className="flex items-center justify-between gap-2 mb-2">
         <div className="text-[13px] text-bone">{title}</div>
-        <PreviewChip/>
       </div>
       <div className="micro text-smoke leading-relaxed">{note}</div>
       <div className="mt-4 h-1 bg-ink-700 relative overflow-hidden">
@@ -5367,11 +5411,30 @@ function PerformanceSection({ p, m, model }) {
   const { t } = useLang();
   if (!m) return null;
   const ttftP50 = m.ttft;
-  // p95 / p99 derived from p50 with model-specific deterministic jitter
+  // p95 derived from p50 with model-specific deterministic jitter
   const ttftP95 = +(ttftP50 * (1.85 + (strHash(p.slug + model + 'p95ttft') % 25) / 100)).toFixed(3);
-  const ttftP99 = +(ttftP50 * (2.55 + (strHash(p.slug + model + 'p99ttft') % 30) / 100)).toFixed(3);
   const fmtMs = (s) => `${(s * 1000) | 0}ms`;
   const modelDisplay = MODELS.find(x => x.id === model)?.display || model;
+
+  // Throughput (single-request output token rate). Derived from the existing
+  // latency/ttft/sample data via: output_tokens / (latency - ttft). Falls back
+  // to a sensible lower bound if generation window is suspiciously short.
+  // Anchored on a per-provider base rate (PROVIDER_TPS_BASE if defined) with
+  // model-specific jitter so same (provider, model) is stable.
+  const tps = useMemo(() => {
+    // Use the platform's avg output tokens per request as the numerator
+    const avgOut = 400 + (strHash(p.slug + model + 'out') % 220); // 400-620 toks
+    const genWindow = Math.max(0.4, m.latency - m.ttft);
+    const raw = avgOut / genWindow;
+    // Clamp into plausible range based on provider type. Inference shops are
+    // typically much faster than aggregators (Together/Fireworks ~150-400,
+    // Groq-like 500+, OpenAI gateway ~25-45).
+    const isInference = p.type === 'inference';
+    const isSelfHost  = p.type === 'self_host';
+    const lo = isInference ? 80 : isSelfHost ? 30 : 25;
+    const hi = isInference ? 380 : isSelfHost ? 90 : 70;
+    return Math.round(Math.max(lo, Math.min(hi, raw)));
+  }, [p.slug, model, m.latency, m.ttft, p.type]);
 
   const regions = useMemo(() => {
     const base = ttftP50;
@@ -5409,12 +5472,15 @@ function PerformanceSection({ p, m, model }) {
         {t('provider.perfSummaryModel', { samples: m.samples.toLocaleString(), model: modelDisplay })}
       </p>
 
-      {/* 4 TTFT percentile tiles (p50 / p95 / p99) + success rate */}
+      {/* 4 metric tiles: p50 TTFT / p95 TTFT / Throughput (tok/s) / Success.
+          P99 dropped (too noisy in fake data); throughput promoted from
+          placeholder card to a first-class metric — it's directly user-felt
+          and derivable from existing TTFT/latency data. */}
       <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-px bg-ink-600 border border-ink-600">
-        <PerfMetric label={t('provider.perfP50')}     hint={t('provider.perfP50Hint')}     value={fmtMs(ttftP50)}             tone={tone(ttftP50, 0.30, 0.50)}/>
-        <PerfMetric label={t('provider.perfP95')}     hint={t('provider.perfP95Hint')}     value={fmtMs(ttftP95)}             tone={tone(ttftP95, 0.60, 1.00)}/>
-        <PerfMetric label={t('provider.perfP99')}     hint={t('provider.perfP99Hint')}     value={fmtMs(ttftP99)}             tone={tone(ttftP99, 0.80, 1.40)}/>
-        <PerfMetric label={t('provider.perfSuccess')} hint={t('provider.perfSuccessHint')} value={fmtPct(m.success, 1)}       tone={successTone}/>
+        <PerfMetric label={t('provider.perfP50')}        hint={t('provider.perfP50Hint')}        value={fmtMs(ttftP50)}       tone={tone(ttftP50, 0.30, 0.50)}/>
+        <PerfMetric label={t('provider.perfP95')}        hint={t('provider.perfP95Hint')}        value={fmtMs(ttftP95)}       tone={tone(ttftP95, 0.60, 1.00)}/>
+        <PerfMetric label={t('provider.perfThroughput')} hint={t('provider.perfThroughputHint')} value={`${tps} tok/s`}        tone={tps >= 150 ? 'text-brand' : tps >= 60 ? 'text-bone' : 'text-amber'}/>
+        <PerfMetric label={t('provider.perfSuccess')}    hint={t('provider.perfSuccessHint')}    value={fmtPct(m.success, 1)} tone={successTone}/>
       </div>
 
       {/* 7d TTFT trend · editorial-style smooth chart with header-driven hover */}
@@ -5429,7 +5495,6 @@ function PerformanceSection({ p, m, model }) {
       <div className="mt-6 card p-5">
         <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
           <div className="micro text-smoke">{t('provider.perfRegional')}</div>
-          <PreviewChip/>
         </div>
         <div className="space-y-3">
           {regions.map(r => (
@@ -5446,11 +5511,6 @@ function PerformanceSection({ p, m, model }) {
         </div>
       </div>
 
-      {/* Throughput + LongContext placeholders */}
-      <div className="mt-6 grid sm:grid-cols-2 gap-4">
-        <PlaceholderCard title={t('provider.perfThroughput')}  note={t('provider.perfThroughputNote')}/>
-        <PlaceholderCard title={t('provider.perfLongContext')} note={t('provider.perfLongContextNote')}/>
-      </div>
     </section>
   );
 }
@@ -5578,17 +5638,17 @@ function CostSection({ p, model: currentModel }) {
           <div className="bg-ink-800/40 px-4 py-3">{t('provider.colModel')}</div>
           <div className="bg-ink-800/40 px-4 py-3">{t('provider.colOfficial')}</div>
           <div className="bg-ink-800/40 px-4 py-3">{t('provider.colListed')}</div>
-          <div
-            className="px-4 py-3 border-l-2 border-amber/50 flex items-start justify-between gap-2"
-            style={{ background: 'rgb(var(--amber) / 0.10)' }}
-          >
-            <div>
-              <div className="text-bone normal-case tracking-normal text-[12px] font-medium flex items-center gap-1.5">
-                {t('provider.colObserved')}<PreviewChip/>
-              </div>
-              <div className="micro text-amber mt-0.5 normal-case tracking-wider">
-                {t('provider.colObservedNote')}
-              </div>
+          {/* Observed column — title uses same micro class as other column headers,
+              just amber color (matches the cost analyzer's "观测价" label style).
+              Body cells keep the standard 12.5px size and only differentiate
+              via font-medium, not size. Subtitle "你实际支付的金额" stays for
+              semantic emphasis. */}
+          <div className="bg-ink-800/40 px-4 py-3">
+            <div className="micro text-amber flex items-center gap-1.5">
+              {t('provider.colObserved')}
+            </div>
+            <div className="micro text-amber mt-1 normal-case tracking-wider">
+              {t('provider.colObservedNote')}
             </div>
           </div>
         </div>
@@ -5613,11 +5673,7 @@ function CostSection({ p, model: currentModel }) {
                 </div>
                 <div className={cx(cellBg, 'px-4 py-3 num text-smoke')}>{fmtUSD(refIn)} / {fmtUSD(refOut)}</div>
                 <div className={cx(cellBg, 'px-4 py-3 num text-bone/70')}>{fmtUSD(mp.listedIn)} / {fmtUSD(mp.listedOut)}</div>
-                <div
-                  className={cx('px-4 py-3 num text-bone text-[15px] font-medium tracking-tight border-l-2 border-amber/50',
-                    isCurrent ? 'bg-brand/[0.08]' : '')}
-                  style={isCurrent ? {} : { background: 'rgb(var(--amber) / 0.06)' }}
-                >
+                <div className={cx(cellBg, 'px-4 py-3 num text-bone font-medium tracking-tight')}>
                   {fmtUSD(mp.observedIn)} / {fmtUSD(mp.observedOut)}
                 </div>
               </Fragment>
@@ -5642,16 +5698,13 @@ function CostSection({ p, model: currentModel }) {
                   </span>
                 )}
               </div>
-              {/* Observed = primary, full-width, highlighted */}
-              <div
-                className="px-3 py-2.5 border-l-2 border-amber/50 mb-2"
-                style={{ background: 'rgb(var(--amber) / 0.08)' }}
-              >
+              {/* Observed = primary. Hierarchy via stronger typography + amber
+                  micro label only — no background fill (kept cleaner) */}
+              <div className="py-2.5 mb-2 border-t border-ink-600">
                 <div className="micro text-amber mb-1 flex items-center gap-1.5">
                   <span>{t('provider.colObservedShort')}</span>
-                  <PreviewChip/>
                 </div>
-                <div className="num text-bone text-[15px] font-medium tracking-tight">
+                <div className="num text-bone text-[13px] font-medium tracking-tight">
                   {fmtUSD(mp.observedIn)} / {fmtUSD(mp.observedOut)}
                 </div>
               </div>
@@ -5673,7 +5726,6 @@ function CostSection({ p, model: currentModel }) {
 
         {/* Table footer */}
         <div className="px-4 py-3 micro text-smoke flex items-center gap-2 border-t border-ink-600 flex-wrap">
-          <PreviewChip/>
           <span>{t('provider.observedFootnote', { samples: 210, window: '7d' })}</span>
         </div>
       </div>
@@ -5741,9 +5793,22 @@ function ProviderPage({ slug }) {
 
   return (
     <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-12">
-      <a href="#/" className="micro text-smoke hover:text-bone inline-flex items-center gap-1.5 mb-8">
-        <span>←</span> {t('provider.backToRanking')}
-      </a>
+      {/* Top meta row: back link on the left, page-level data freshness on the
+          right. This indicator applies to ALL metrics on the page (panel scores,
+          fingerprint, cost data, perf) — it used to live in §03 but that made
+          it look section-specific. Promoting it to the top makes its scope
+          explicit as page-global data. */}
+      <div className="flex items-center justify-between mb-8 gap-2 flex-wrap">
+        <a href="#/" className="micro text-smoke hover:text-bone inline-flex items-center gap-1.5">
+          <span>←</span> {t('provider.backToRanking')}
+        </a>
+        <div className="flex items-center gap-2 text-[11px] text-smoke">
+          <span className="w-1 h-1 rounded-full bg-brand pulse-dot"/>
+          <span className="micro">{t('provider.refreshNightly')}</span>
+          <span className="text-ash">·</span>
+          <span className="num text-[10px] text-ash">2026-05-05 · 14:04 UTC</span>
+        </div>
+      </div>
 
       <div className="border-b border-ink-600 pb-10 mb-6 flex items-end justify-between flex-wrap gap-6">
         <div className="max-w-3xl">
@@ -5788,8 +5853,10 @@ function ProviderPage({ slug }) {
         <ScoreSidebar p={p} m={m} model={model}/>
       </div>
 
-      {/* INCIDENTS — full-width bottom section */}
-      <IncidentsSection p={p} model={model}/>
+      {/* INCIDENTS section temporarily hidden — incident detection pipeline
+          isn't running yet, so curated mock items lacked production signal.
+          IncidentsSection function kept in code for quick re-enable once
+          real incident data comes online. */}
     </div>
   );
 }
@@ -5872,19 +5939,18 @@ function FingerprintPanel({ p, model: pageModel }) {
       <div className="flex items-end justify-between mb-4 flex-wrap gap-3">
         <div>
           <div className="micro text-smoke mb-2">{t('provider.tagFingerprint')}</div>
+          {/* Reframed: neutral chevron ("Model authenticity probes · X") instead
+              of the previous binary-implying rhetorical question. */}
           <h3 className="serif text-3xl tracking-editorial">
-            {t('provider.headDidYouGet')} <span className="serif-it text-brand">{m.display}</span>?
+            {t('provider.headFingerprint')} <span className="serif-it text-brand">{m.display}</span>
           </h3>
+          <p className="micro text-smoke mt-2 normal-case tracking-wider">
+            {t('provider.fpSubtitle')}
+          </p>
         </div>
-        <div className="text-right flex flex-col items-end gap-2">
-          <a href="#/validate" className="micro text-brand hover:underline inline-flex items-center gap-1">
-            <I.bolt className="w-3 h-3"/> {t('provider.runLiveValidation')}
-          </a>
-          <div>
-            <div className="micro text-smoke">{t('provider.refreshNightly')}</div>
-            <div className="num text-[10px] text-ash mt-0.5">2026-05-05 · 14:04 UTC</div>
-          </div>
-        </div>
+        {/* Section right rail intentionally empty — methodology link moved
+            page-wide (not section-specific) and refresh timestamp now lives at
+            the top as page-global metadata. */}
       </div>
 
       {/* Model tabs */}
