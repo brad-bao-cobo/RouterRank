@@ -1930,7 +1930,7 @@ const I18N = {
       providersUnsupportedByModel: 'No {model} support',
       providersClose: 'Done',
       emptyHeroLabel: 'Start a conversation',
-      emptyHeroTitle: 'What would you like to test?',
+      emptyHeroTitle: 'One prompt. N answers.',
       emptyHeroSub: 'Your message will fan out to {n} active providers in parallel.',
       emptyTemplatesLabel: 'Or pick a starter prompt',
       topbarModelLabel: 'MODEL',
@@ -2109,6 +2109,143 @@ const I18N = {
       copied: 'Copied',
       cancel: 'Cancel',
       close: 'Close',
+    },
+    apply: {
+      navLink: 'Apply',
+      footerLink: 'Apply for listing →',
+      back: 'Back',
+      pageTitle: 'Apply for listing',
+      pageSubtitle: 'Add your AI router to RouterRank. Reviewed by our BD team.',
+      reqProgress: '{filled} / {total} required',
+      submitBtn: 'Submit application',
+      submitting: 'Submitting…',
+      submitHint: 'By submitting you confirm the information is accurate. The test API key is destroyed after a one-time verification.',
+      draftBannerTitle: 'Unfinished application detected',
+      draftBannerSub: 'Picking up from your last visit.',
+      draftRestore: 'Restore draft',
+      draftDiscard: 'Discard',
+      draftSaved: 'Draft saved locally',
+      sec1: 'Basics',
+      sec1Hint: 'How your router shows up on the leaderboard.',
+      sec2: 'API access',
+      sec2Hint: 'Endpoint, auth and a test key for one-time verification.',
+      sec3: 'Supported models',
+      sec3Hint: 'Models you list, with listed prices (USD per 1M tokens).',
+      sec4: 'Contact',
+      sec4Hint: 'Who we should reach for review and onboarding.',
+      sec5: 'Compliance',
+      sec5Hint: 'Optional — certifications and policy links accelerate review.',
+      sec6: 'Other',
+      sec6Hint: 'Review pace, notes, where you heard about us.',
+      fName: 'Router name',
+      fNamePh: 'e.g. Sundial Router',
+      fType: 'Type',
+      fTypeGateway: 'Gateway',
+      fTypeRouter: 'Router',
+      fTypeInference: 'Direct inference',
+      fTypeMarketplace: 'Model marketplace',
+      fTypeSelfhost: 'Self-hosted',
+      fRegion: 'Service region',
+      fRegionGlobal: 'Global',
+      fRegionUS: 'US only',
+      fRegionEU: 'EU only',
+      fRegionAsia: 'Asia only',
+      fRegionSelfhost: 'Self-hosted',
+      fRegionMulti: 'Multi-region',
+      fWebsite: 'Website',
+      fWebsitePh: 'https://example.com',
+      fLogoDomain: 'Logo domain',
+      fLogoDomainHint: 'Used to fetch your logo via Clearbit. Just the bare domain.',
+      fLogoDomainPh: 'example.com',
+      fShortDesc: 'Short description',
+      fShortDescHint: 'Up to 120 chars. Shown on the leaderboard row.',
+      fLongDesc: 'Full description',
+      fLongDescHint: 'Up to 500 chars. Markdown supported. Shown on the detail page hero.',
+      fApiBaseUrl: 'API base URL',
+      fApiBaseUrlPh: 'https://api.example.com/v1',
+      fAuthMethod: 'Auth method',
+      fAuthBearer: 'Bearer token',
+      fAuthHeader: 'Header API key',
+      fAuthOAuth: 'OAuth 2.0',
+      fAuthCustom: 'Custom',
+      fApiKey: 'Test API key',
+      fApiKeyPh: 'sk-…',
+      fApiKeySafety: 'This key is used for one-time connectivity verification, then destroyed. Use a dedicated test key — never a production key.',
+      fApiKeyShow: 'Show',
+      fApiKeyHide: 'Hide',
+      fApiDocs: 'API docs URL',
+      fApiDocsPh: 'https://docs.example.com',
+      fRateLimits: 'Rate limits',
+      fRateLimitsPh: 'e.g. 10K TPM · 1K RPM',
+      fOpenaiCompat: 'OpenAI compatibility',
+      fCompatYes: 'Yes — full',
+      fCompatPartial: 'Partial',
+      fCompatNo: 'No',
+      fModels: 'Supported models',
+      fModelsHint: 'Tick the models you serve. For each, fill listed in/out price per 1M tokens (USD).',
+      fListedIn: 'Listed in',
+      fListedOut: 'Listed out',
+      fCustomModelsTitle: 'Custom models (not in the list above)',
+      fCustomModelAdd: '+ Add custom model',
+      fCustomModelName: 'Display name',
+      fCustomModelOwner: 'Owner',
+      fCustomModelRemove: 'Remove',
+      fCompanyName: 'Company legal name',
+      fCompanyNamePh: 'e.g. Sundial Labs, Inc.',
+      fContactName: 'Contact name',
+      fContactNamePh: 'Full name',
+      fContactEmail: 'Contact email',
+      fContactEmailPh: 'name@example.com',
+      fContactRole: 'Contact role',
+      fRoleBD: 'BD / Sales',
+      fRoleEng: 'Engineering',
+      fRoleCEO: 'CEO',
+      fRoleFounder: 'Founder',
+      fRoleMarketing: 'Marketing',
+      fRoleOther: 'Other',
+      fTimezone: 'Timezone',
+      fTimezonePh: 'e.g. UTC+8',
+      fAddress: 'Company address',
+      fAddressHint: 'Optional. Used for legal & compliance archiving.',
+      fCompliance: 'Certifications',
+      fComplianceSoc2: 'SOC 2 Type II',
+      fComplianceHipaa: 'HIPAA',
+      fComplianceGdpr: 'GDPR',
+      fComplianceIso: 'ISO 27001',
+      fComplianceOther: 'Other',
+      fPrivacy: 'Privacy policy URL',
+      fTerms: 'Terms of service URL',
+      fDataRetention: 'Data retention policy',
+      fDataRetentionPh: 'e.g. 30d · no training on prompts',
+      fReviewSpeed: 'Review priority',
+      fReviewStandard: 'Standard · 3–5 business days',
+      fReviewRush: 'Rush · within 24h (expedited)',
+      fNotes: 'Notes for BD',
+      fNotesPh: 'Anything else we should know — what makes you different, edge cases, custom routing logic…',
+      fSource: 'How did you find us?',
+      fSourceSocial: 'Social media',
+      fSourceSearch: 'Google search',
+      fSourceReferral: 'Referral',
+      fSourceCommunity: 'Developer community',
+      fSourceOther: 'Other',
+      errRequired: 'This field is required.',
+      errUrl: 'Must be a valid URL starting with http:// or https://.',
+      errEmail: 'Must be a valid email address.',
+      errTooLong: 'Too long ({n} max).',
+      errModelPrice: 'Listed price required.',
+      errNoModels: 'Pick at least one model or add a custom one.',
+      successTitle: 'Application received',
+      successRefLabel: 'Reference number',
+      successCopyRef: 'Copy reference',
+      successCopied: 'Copied',
+      successNextTitle: 'What happens next',
+      successNext1: 'BD team is notified. Usually a response within 24 hours.',
+      successNext2: 'We verify connectivity with the test key you provided (destroyed after).',
+      successNext3: 'If the initial review passes, we email you with next steps.',
+      successNext4: 'Expect 3–5 business days for full onboarding.',
+      successDone: 'Done',
+      successAnother: 'Submit another',
+      requiredMark: '*',
     },
   },
   zh: {
@@ -2642,7 +2779,7 @@ const I18N = {
       providersUnsupportedByModel: '不支持 {model}',
       providersClose: '完成',
       emptyHeroLabel: '开始一段对话',
-      emptyHeroTitle: '今天想测点什么？',
+      emptyHeroTitle: '一条 prompt，N 家答。',
       emptyHeroSub: '你的消息会同时发给当前激活的 {n} 家服务商。',
       emptyTemplatesLabel: '或选一个起手式 prompt',
       topbarModelLabel: '模型',
@@ -2821,6 +2958,143 @@ const I18N = {
       copied: '已复制',
       cancel: '取消',
       close: '关闭',
+    },
+    apply: {
+      navLink: '申请上架',
+      footerLink: '为中转站申请上架 →',
+      back: '返回',
+      pageTitle: '申请上架',
+      pageSubtitle: '把你的 API 中转站加入 RouterRank · 由 BD 团队人工审核。',
+      reqProgress: '已填 {filled} / {total}',
+      submitBtn: '提交申请',
+      submitting: '提交中…',
+      submitHint: '提交即表示信息属实。测试 API Key 在一次性接通验证后立即销毁。',
+      draftBannerTitle: '检测到未完成的申请',
+      draftBannerSub: '从上次填写处继续。',
+      draftRestore: '恢复草稿',
+      draftDiscard: '丢弃',
+      draftSaved: '已自动保存到本地',
+      sec1: '§1 基础信息',
+      sec1Hint: '决定你在榜单上的呈现。',
+      sec2: '§2 API 接入',
+      sec2Hint: '端点、认证方式与一次性验证用的测试 Key。',
+      sec3: '§3 支持的模型',
+      sec3Hint: '你列出的模型及其官标价 (USD / 1M tok)。',
+      sec4: '§4 联系信息',
+      sec4Hint: '审核与上架联络人。',
+      sec5: '§5 合规凭证',
+      sec5Hint: 'Optional · 资质和政策链接可加速审核。',
+      sec6: '§6 其他',
+      sec6Hint: '审核优先级、备注、来源。',
+      fName: '中转站名称',
+      fNamePh: '例：Sundial Router',
+      fType: '类型',
+      fTypeGateway: 'Gateway 网关',
+      fTypeRouter: 'Router 路由',
+      fTypeInference: '直接推理商',
+      fTypeMarketplace: '模型市集',
+      fTypeSelfhost: '自托管',
+      fRegion: '服务区域',
+      fRegionGlobal: '全球',
+      fRegionUS: '仅美区',
+      fRegionEU: '仅欧区',
+      fRegionAsia: '仅亚区',
+      fRegionSelfhost: '自托管',
+      fRegionMulti: '多区域',
+      fWebsite: '官网',
+      fWebsitePh: 'https://example.com',
+      fLogoDomain: 'Logo 域名',
+      fLogoDomainHint: '用于通过 Clearbit 自动抓取 logo。仅填裸域名。',
+      fLogoDomainPh: 'example.com',
+      fShortDesc: '简短介绍',
+      fShortDescHint: '≤120 字 · 显示在榜单列表行。',
+      fLongDesc: '完整介绍',
+      fLongDescHint: '≤500 字 · 支持 Markdown · 显示在详情页 hero。',
+      fApiBaseUrl: 'API Base URL',
+      fApiBaseUrlPh: 'https://api.example.com/v1',
+      fAuthMethod: '认证方式',
+      fAuthBearer: 'Bearer Token',
+      fAuthHeader: 'Header API Key',
+      fAuthOAuth: 'OAuth 2.0',
+      fAuthCustom: '自定义',
+      fApiKey: '测试 API Key',
+      fApiKeyPh: 'sk-…',
+      fApiKeySafety: '此 Key 仅用于一次性接通验证，验证后立即销毁。请勿使用生产 Key — 建议申请专用测试 Key。',
+      fApiKeyShow: '显示',
+      fApiKeyHide: '隐藏',
+      fApiDocs: 'API 文档 URL',
+      fApiDocsPh: 'https://docs.example.com',
+      fRateLimits: 'Rate Limits',
+      fRateLimitsPh: '例：10K TPM · 1K RPM',
+      fOpenaiCompat: 'OpenAI 兼容性',
+      fCompatYes: '完全兼容',
+      fCompatPartial: '部分兼容',
+      fCompatNo: '不兼容',
+      fModels: '支持的模型',
+      fModelsHint: '勾选你提供的模型，并为每个填入官标 in / out 单价 (USD / 1M tok)。',
+      fListedIn: '官标 in',
+      fListedOut: '官标 out',
+      fCustomModelsTitle: '自定义模型 (不在以上列表中)',
+      fCustomModelAdd: '+ 添加自定义模型',
+      fCustomModelName: '模型名',
+      fCustomModelOwner: '出品方',
+      fCustomModelRemove: '移除',
+      fCompanyName: '公司全名',
+      fCompanyNamePh: '例：Sundial Labs, Inc.',
+      fContactName: '联系人姓名',
+      fContactNamePh: '全名',
+      fContactEmail: '联系人邮箱',
+      fContactEmailPh: 'name@example.com',
+      fContactRole: '联系人角色',
+      fRoleBD: 'BD / 销售',
+      fRoleEng: '工程',
+      fRoleCEO: 'CEO',
+      fRoleFounder: '创始人',
+      fRoleMarketing: '市场',
+      fRoleOther: '其他',
+      fTimezone: '时区',
+      fTimezonePh: '例：UTC+8',
+      fAddress: '公司地址',
+      fAddressHint: 'Optional · 用于法律与合规归档。',
+      fCompliance: '资质',
+      fComplianceSoc2: 'SOC 2 Type II',
+      fComplianceHipaa: 'HIPAA',
+      fComplianceGdpr: 'GDPR',
+      fComplianceIso: 'ISO 27001',
+      fComplianceOther: '其他',
+      fPrivacy: '隐私政策 URL',
+      fTerms: '服务条款 URL',
+      fDataRetention: '数据保留政策',
+      fDataRetentionPh: '例：30 天 · 不用于训练',
+      fReviewSpeed: '审核优先级',
+      fReviewStandard: 'Standard · 3–5 工作日',
+      fReviewRush: 'Rush · 24 小时内 (加急)',
+      fNotes: '备注给 BD',
+      fNotesPh: '其他想说的 — 你的特殊之处、边界场景、自定义路由逻辑…',
+      fSource: '从哪里知道我们？',
+      fSourceSocial: '社交媒体',
+      fSourceSearch: 'Google 搜索',
+      fSourceReferral: '他人推荐',
+      fSourceCommunity: '开发者社区',
+      fSourceOther: '其他',
+      errRequired: '此项必填。',
+      errUrl: '需为合法 URL，以 http:// 或 https:// 开头。',
+      errEmail: '需为合法邮箱地址。',
+      errTooLong: '超出长度上限 ({n} 字符)。',
+      errModelPrice: '请填写官标价。',
+      errNoModels: '请勾选至少一个模型，或添加自定义模型。',
+      successTitle: '申请已收到',
+      successRefLabel: '参考号',
+      successCopyRef: '复制参考号',
+      successCopied: '已复制',
+      successNextTitle: '接下来会发生什么',
+      successNext1: 'BD 团队收到通知 · 一般 24 小时内回复。',
+      successNext2: '我们会用你提供的测试 API Key 验证接通性 (一次性，验后销毁)。',
+      successNext3: '初审通过后会发邮件给你。',
+      successNext4: '预期 3-5 工作日完成上架。',
+      successDone: '完成',
+      successAnother: '再提交一份',
+      requiredMark: '*',
     },
   },
 };
@@ -3001,6 +3275,17 @@ function Header() {
             <span className="w-1.5 h-1.5 bg-brand rounded-full pulse-dot"></span>
             <span className="micro text-ash">{t('header.ticker', { n: TOTAL_SAMPLES.toLocaleString() })}</span>
           </span>
+          <a
+            href="#/apply"
+            className={cx(
+              'hidden md:inline-flex items-center px-3 h-8 text-[12px] italic tracking-tight transition-colors',
+              path === '/apply'
+                ? 'text-brand border-b border-brand'
+                : 'text-brand hover:text-bone'
+            )}
+          >
+            {t('apply.navLink')}
+          </a>
           <button
             onClick={toggleLang}
             aria-label={t('header.switchLang')}
@@ -3057,6 +3342,17 @@ function Header() {
                 </a>
               );
             })}
+            <a
+              href="#/apply"
+              onClick={() => setMenuOpen(false)}
+              className={cx(
+                'py-3 border-b border-ink-600 last:border-0 text-[15px] italic tracking-tight flex items-center justify-between',
+                path === '/apply' ? 'text-brand' : 'text-brand/80'
+              )}
+            >
+              <span>{t('apply.navLink')}</span>
+              {path === '/apply' && <span className="micro text-brand">{lang === 'zh' ? '当前' : 'current'}</span>}
+            </a>
             <div className="mt-4 pt-4 border-t border-ink-600 flex items-center justify-between micro text-smoke">
               <span className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 bg-brand rounded-full pulse-dot"></span>
@@ -3094,6 +3390,7 @@ function Footer() {
             <li><a href="#/run" className="ulink">{t('footer.linkRun')}</a></li>
             <li><a href="#/validate" className="ulink">{t('footer.linkValidate')}</a></li>
             <li><a href="#/docs" className="ulink">{t('footer.linkApiSdk')}</a></li>
+            <li><a href="#/apply" className="ulink italic text-brand hover:text-bone">{t('apply.footerLink')}</a></li>
           </ul>
         </div>
         <div>
@@ -4964,7 +5261,7 @@ function ComposeBox({ value, onChange, onSubmit, onStop, inFlight, disabled, dis
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = 'auto';
-    el.style.height = Math.min(el.scrollHeight, 180) + 'px';
+    el.style.height = Math.min(el.scrollHeight, 240) + 'px';
   }, [value]);
 
   const onKeyDown = (e) => {
@@ -4994,11 +5291,11 @@ function ComposeBox({ value, onChange, onSubmit, onStop, inFlight, disabled, dis
           value={value}
           onChange={e => onChange(e.target.value)}
           onKeyDown={onKeyDown}
-          rows={1}
+          rows={4}
           placeholder={placeholder}
           disabled={disabled}
           className="w-full bg-transparent outline-none px-4 py-3 pr-16 text-[13px] resize-none text-bone leading-relaxed disabled:opacity-50 disabled:cursor-not-allowed"
-          style={{ minHeight: 52, maxHeight: 180 }}
+          style={{ minHeight: 108, maxHeight: 240 }}
         />
         {inFlight ? (
           <button
@@ -6896,6 +7193,1086 @@ function Methods({ items }) {
 }
 
 /* ===========================================================
+   APPLY PAGE  ·  self-service listing application
+   ===========================================================
+   Single long form, 6 sections, right-side sticky TOC + progress.
+   Mock submission (no real backend) — generates a ref number,
+   clears localStorage draft, shows inline success state.
+   API key field is password-masked AND excluded from draft.
+   =========================================================== */
+
+const APPLY_DRAFT_KEY = 'applyDraft_v1';
+const APPLY_SENSITIVE_FIELDS = ['apiKey'];
+
+function useApplyDraft(initial) {
+  // Returns [draft, setDraft, hasDraft, clear, restoreOffered]
+  const [draft, _setDraft] = useState(initial);
+  const [restoreOffered, setRestoreOffered] = useState(false);
+  const [hasStoredDraft, setHasStoredDraft] = useState(false);
+
+  // On mount, check if there's a saved draft
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(APPLY_DRAFT_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+          setHasStoredDraft(true);
+          setRestoreOffered(true);
+        }
+      }
+    } catch {}
+  }, []);
+
+  const setDraft = (next) => {
+    _setDraft(next);
+    // Auto-save (debounced via simple field-count trigger; we just write on every change)
+    try {
+      const stripped = { ...next };
+      APPLY_SENSITIVE_FIELDS.forEach(k => { delete stripped[k]; });
+      // Count non-empty top-level scalar fields
+      const filled = Object.values(stripped).filter(v => {
+        if (Array.isArray(v)) return v.length > 0;
+        if (typeof v === 'string') return v.trim().length > 0;
+        return v != null && v !== '';
+      }).length;
+      if (filled >= 3) {
+        localStorage.setItem(APPLY_DRAFT_KEY, JSON.stringify(stripped));
+      }
+    } catch {}
+  };
+
+  const restore = () => {
+    try {
+      const raw = localStorage.getItem(APPLY_DRAFT_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        _setDraft(prev => ({ ...prev, ...parsed }));
+      }
+    } catch {}
+    setRestoreOffered(false);
+  };
+
+  const discard = () => {
+    try { localStorage.removeItem(APPLY_DRAFT_KEY); } catch {}
+    setHasStoredDraft(false);
+    setRestoreOffered(false);
+  };
+
+  const clearDraft = () => {
+    try { localStorage.removeItem(APPLY_DRAFT_KEY); } catch {}
+    setHasStoredDraft(false);
+  };
+
+  return { draft, setDraft, restoreOffered, restore, discard, clearDraft };
+}
+
+/* ---------- Form primitives ---------- */
+
+function FormField({ label, hint, error, required, htmlFor, children, charCount }) {
+  const { t } = useLang();
+  return (
+    <div className="mb-6">
+      <div className="flex items-baseline justify-between gap-3 mb-2">
+        <label htmlFor={htmlFor} className="block text-[12px] tracking-wider text-bone uppercase font-medium">
+          {label}
+          {required && <span className="text-coral ml-1">{t('apply.requiredMark')}</span>}
+        </label>
+        {charCount != null && (
+          <span className={cx('micro num tabular-nums', charCount.over ? 'text-coral' : 'text-smoke')}>
+            {charCount.value} / {charCount.max}
+          </span>
+        )}
+      </div>
+      {children}
+      {error ? (
+        <p className="mt-1.5 text-[12px] text-coral flex items-center gap-1.5">
+          <I.alert className="w-3 h-3 shrink-0"/>
+          <span>{error}</span>
+        </p>
+      ) : hint ? (
+        <p className="mt-1.5 text-[12px] text-smoke leading-relaxed">{hint}</p>
+      ) : null}
+    </div>
+  );
+}
+
+const FORM_INPUT_BASE =
+  'w-full bg-ink-800 border border-ink-500 px-3.5 py-2.5 text-sm text-bone placeholder:text-smoke ' +
+  'transition-colors focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand/30';
+const FORM_INPUT_ERROR = 'border-coral focus:border-coral focus:ring-coral/30';
+
+function FormInput({ id, value, onChange, placeholder, type = 'text', error, autoComplete = 'off' }) {
+  return (
+    <input
+      id={id}
+      type={type}
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      placeholder={placeholder}
+      autoComplete={autoComplete}
+      className={cx(FORM_INPUT_BASE, error && FORM_INPUT_ERROR)}
+    />
+  );
+}
+
+function FormPasswordInput({ id, value, onChange, placeholder, error }) {
+  const [shown, setShown] = useState(false);
+  const { t } = useLang();
+  return (
+    <div className="relative">
+      <input
+        id={id}
+        type={shown ? 'text' : 'password'}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        autoComplete="off"
+        spellCheck={false}
+        className={cx(FORM_INPUT_BASE, 'pr-20 font-mono', error && FORM_INPUT_ERROR)}
+      />
+      <button
+        type="button"
+        onClick={() => setShown(s => !s)}
+        className="absolute right-1 top-1 bottom-1 px-2.5 inline-flex items-center gap-1 text-[11px] tracking-wider text-ash hover:text-bone hover:bg-ink-700 transition-colors"
+        aria-label={shown ? t('apply.fApiKeyHide') : t('apply.fApiKeyShow')}
+      >
+        {shown ? <I.eyeOff className="w-3.5 h-3.5"/> : <I.eye className="w-3.5 h-3.5"/>}
+        <span className="hidden sm:inline">{shown ? t('apply.fApiKeyHide') : t('apply.fApiKeyShow')}</span>
+      </button>
+    </div>
+  );
+}
+
+function FormTextarea({ id, value, onChange, placeholder, rows = 4, error }) {
+  return (
+    <textarea
+      id={id}
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      placeholder={placeholder}
+      rows={rows}
+      className={cx(FORM_INPUT_BASE, 'resize-y leading-relaxed', error && FORM_INPUT_ERROR)}
+    />
+  );
+}
+
+function FormSelect({ id, value, onChange, options, error, placeholder }) {
+  return (
+    <div className="relative">
+      <select
+        id={id}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className={cx(FORM_INPUT_BASE, 'appearance-none pr-9 cursor-pointer', !value && 'text-smoke', error && FORM_INPUT_ERROR)}
+      >
+        {placeholder && <option value="" disabled>{placeholder}</option>}
+        {options.map(o => (
+          <option key={o.value} value={o.value} className="text-bone bg-ink-800">{o.label}</option>
+        ))}
+      </select>
+      <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-ash">
+        <I.arrowDown className="w-4 h-4"/>
+      </span>
+    </div>
+  );
+}
+
+function FormRadioGroup({ name, value, onChange, options, error }) {
+  return (
+    <div className={cx('grid sm:grid-cols-2 gap-2', error && 'ring-1 ring-coral/40 p-2')}>
+      {options.map(o => {
+        const active = value === o.value;
+        return (
+          <label
+            key={o.value}
+            className={cx(
+              'flex items-start gap-2.5 px-3.5 py-2.5 border cursor-pointer transition-colors text-sm',
+              active ? 'border-brand bg-brand/[0.08] text-bone' : 'border-ink-500 text-ash hover:border-ash hover:text-bone'
+            )}
+          >
+            <input
+              type="radio"
+              name={name}
+              value={o.value}
+              checked={active}
+              onChange={() => onChange(o.value)}
+              className="sr-only"
+            />
+            <span className={cx('mt-1 w-3 h-3 rounded-full border shrink-0 transition-colors', active ? 'border-brand bg-brand' : 'border-ash')}>
+              {active && <span className="block w-1 h-1 m-auto mt-0.5 rounded-full bg-bone"/>}
+            </span>
+            <div className="flex-1 leading-snug">
+              <div className="text-bone">{o.label}</div>
+              {o.hint && <div className="micro text-smoke mt-0.5">{o.hint}</div>}
+            </div>
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
+function FormCheckboxGroup({ value, onChange, options }) {
+  const toggle = (v) => {
+    const next = value.includes(v) ? value.filter(x => x !== v) : [...value, v];
+    onChange(next);
+  };
+  return (
+    <div className="grid sm:grid-cols-2 gap-2">
+      {options.map(o => {
+        const active = value.includes(o.value);
+        return (
+          <label
+            key={o.value}
+            className={cx(
+              'flex items-center gap-2.5 px-3.5 py-2.5 border cursor-pointer transition-colors text-sm',
+              active ? 'border-brand bg-brand/[0.08] text-bone' : 'border-ink-500 text-ash hover:border-ash hover:text-bone'
+            )}
+          >
+            <input
+              type="checkbox"
+              checked={active}
+              onChange={() => toggle(o.value)}
+              className="sr-only"
+            />
+            <span className={cx('w-3.5 h-3.5 border shrink-0 inline-flex items-center justify-center transition-colors', active ? 'border-brand bg-brand text-ink' : 'border-ash')}>
+              {active && <I.check className="w-3 h-3"/>}
+            </span>
+            <span className="flex-1">{o.label}</span>
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ---------- Apply Page main component ---------- */
+
+const APPLY_INITIAL_FORM = {
+  // §1
+  name: '', type: '', region: '', website: '',
+  logoDomain: '', shortDesc: '', longDesc: '',
+  // §2
+  apiBaseUrl: '', authMethod: '', apiKey: '',
+  apiDocsUrl: '', rateLimits: '', openaiCompat: '',
+  // §3
+  supportedModels: [],   // [{ id, listedIn: '', listedOut: '' }]
+  customModels: [],      // [{ name, owner, listedIn, listedOut }]
+  // §4
+  companyName: '', contactName: '', contactEmail: '',
+  contactRole: '', timezone: '', address: '',
+  // §5
+  compliance: [],
+  privacyUrl: '', termsUrl: '', dataRetention: '',
+  // §6
+  reviewSpeed: 'standard',
+  notes: '', source: '',
+};
+
+function isUrl(s) {
+  if (!s) return false;
+  return /^https?:\/\/[^\s]+\.[^\s]+/.test(s.trim());
+}
+function isEmail(s) {
+  if (!s) return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
+}
+
+function genRefId() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // unambiguous
+  let suffix = '';
+  for (let i = 0; i < 6; i++) suffix += chars[Math.floor(Math.random() * chars.length)];
+  return `APP-${y}-${m}-${day}-${suffix}`;
+}
+
+const APPLY_SECTIONS = [
+  { id: 'sec1', key: 'sec1' },
+  { id: 'sec2', key: 'sec2' },
+  { id: 'sec3', key: 'sec3' },
+  { id: 'sec4', key: 'sec4' },
+  { id: 'sec5', key: 'sec5' },
+  { id: 'sec6', key: 'sec6' },
+];
+
+const APPLY_REQUIRED_FIELDS = [
+  'name', 'type', 'region', 'website', 'shortDesc',
+  'apiBaseUrl', 'authMethod', 'apiKey',
+  // §3: supportedModels OR customModels (handled separately)
+  'companyName', 'contactName', 'contactEmail',
+];
+// 11 scalar required + 1 model-pick → total 12
+
+function ApplyPage() {
+  const { t, lang } = useLang();
+  const { route, navigate } = useRouter();
+  const toast = useToast();
+
+  const { draft, setDraft, restoreOffered, restore, discard, clearDraft } = useApplyDraft(APPLY_INITIAL_FORM);
+  const [errors, setErrors] = useState({});
+  const [submitting, setSubmitting] = useState(false);
+  const [refId, setRefId] = useState(null);
+  const [activeSec, setActiveSec] = useState('sec1');
+  const [copiedRef, setCopiedRef] = useState(false);
+
+  // Scroll-spy: track which section is currently in the viewport
+  useEffect(() => {
+    if (refId) return; // success state — no spy needed
+    const observer = new IntersectionObserver(
+      entries => {
+        // Pick the topmost visible section
+        const visible = entries
+          .filter(e => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (visible.length > 0) setActiveSec(visible[0].target.id);
+      },
+      { rootMargin: '-20% 0px -60% 0px', threshold: 0 }
+    );
+    APPLY_SECTIONS.forEach(s => {
+      const el = document.getElementById(s.id);
+      if (el) observer.observe(el);
+    });
+    return () => observer.disconnect();
+  }, [refId]);
+
+  const set = (key, val) => {
+    setDraft({ ...draft, [key]: val });
+    // Clear error for that field as user types
+    if (errors[key]) {
+      setErrors(prev => { const n = { ...prev }; delete n[key]; return n; });
+    }
+  };
+
+  const setModel = (modelId, patch) => {
+    const existing = draft.supportedModels.find(m => m.id === modelId);
+    let next;
+    if (existing) {
+      next = draft.supportedModels.map(m => m.id === modelId ? { ...m, ...patch } : m);
+    } else {
+      next = [...draft.supportedModels, { id: modelId, listedIn: '', listedOut: '', ...patch }];
+    }
+    setDraft({ ...draft, supportedModels: next });
+  };
+
+  const toggleModel = (modelId) => {
+    const exists = draft.supportedModels.some(m => m.id === modelId);
+    const next = exists
+      ? draft.supportedModels.filter(m => m.id !== modelId)
+      : [...draft.supportedModels, { id: modelId, listedIn: '', listedOut: '' }];
+    setDraft({ ...draft, supportedModels: next });
+  };
+
+  const addCustomModel = () => {
+    setDraft({ ...draft, customModels: [...draft.customModels, { name: '', owner: '', listedIn: '', listedOut: '' }] });
+  };
+  const updateCustomModel = (idx, patch) => {
+    const next = draft.customModels.map((m, i) => i === idx ? { ...m, ...patch } : m);
+    setDraft({ ...draft, customModels: next });
+  };
+  const removeCustomModel = (idx) => {
+    setDraft({ ...draft, customModels: draft.customModels.filter((_, i) => i !== idx) });
+  };
+
+  // Validation
+  const validate = () => {
+    const e = {};
+    APPLY_REQUIRED_FIELDS.forEach(f => {
+      const v = draft[f];
+      if (!v || (typeof v === 'string' && !v.trim())) e[f] = t('apply.errRequired');
+    });
+    // URLs
+    ['website', 'apiBaseUrl'].forEach(f => {
+      if (draft[f] && !isUrl(draft[f])) e[f] = t('apply.errUrl');
+    });
+    ['apiDocsUrl', 'privacyUrl', 'termsUrl'].forEach(f => {
+      if (draft[f] && !isUrl(draft[f])) e[f] = t('apply.errUrl');
+    });
+    // Email
+    if (draft.contactEmail && !isEmail(draft.contactEmail)) e.contactEmail = t('apply.errEmail');
+    // Lengths
+    if (draft.shortDesc && draft.shortDesc.length > 120) e.shortDesc = t('apply.errTooLong').replace('{n}', 120);
+    if (draft.longDesc && draft.longDesc.length > 500) e.longDesc = t('apply.errTooLong').replace('{n}', 500);
+    // Models
+    const totalModels = draft.supportedModels.length + draft.customModels.filter(m => m.name.trim()).length;
+    if (totalModels === 0) e.supportedModels = t('apply.errNoModels');
+    // Model prices
+    draft.supportedModels.forEach(m => {
+      if (!m.listedIn || !m.listedOut) e[`model_${m.id}`] = t('apply.errModelPrice');
+    });
+    return e;
+  };
+
+  const onSubmit = () => {
+    const e = validate();
+    setErrors(e);
+    const errKeys = Object.keys(e);
+    if (errKeys.length > 0) {
+      // Scroll to first error
+      // Map error key → DOM id
+      const firstErr = errKeys[0];
+      const sel = firstErr.startsWith('model_')
+        ? '#sec3'
+        : `#field-${firstErr}`;
+      const el = document.querySelector(sel);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    setSubmitting(true);
+    // Simulate network delay
+    setTimeout(() => {
+      const id = genRefId();
+      setRefId(id);
+      setSubmitting(false);
+      clearDraft();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 1400);
+  };
+
+  // Required progress
+  const requiredFilled = (() => {
+    let n = 0;
+    APPLY_REQUIRED_FIELDS.forEach(f => {
+      const v = draft[f];
+      if (v && (typeof v !== 'string' || v.trim())) n++;
+    });
+    if (draft.supportedModels.length > 0 || draft.customModels.some(m => m.name.trim())) n++;
+    return n;
+  })();
+  const requiredTotal = APPLY_REQUIRED_FIELDS.length + 1;
+
+  /* ---------- SUCCESS STATE ---------- */
+  if (refId) {
+    return <ApplySuccess refId={refId} onAnother={() => { setRefId(null); setDraft(APPLY_INITIAL_FORM); }}/>;
+  }
+
+  /* ---------- FORM ---------- */
+  return (
+    <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-14">
+      {/* Back link */}
+      <a href="#/" className="micro text-smoke hover:text-bone inline-flex items-center gap-1.5 mb-6 transition-colors">
+        <span className="inline-block transition-transform group-hover:-translate-x-0.5">←</span>
+        {t('apply.back')}
+      </a>
+
+      {/* Page header */}
+      <div className="mb-10 lg:mb-14">
+        <div className="micro text-brand mb-3 tracking-widest">RR-001 · APPLY</div>
+        <h1 className="font-serif text-5xl sm:text-6xl lg:text-7xl text-bone tracking-editorial leading-[0.95]">
+          {t('apply.pageTitle')}
+          <span className="text-brand italic">.</span>
+        </h1>
+        <p className="mt-5 text-ash text-lg max-w-2xl leading-relaxed">{t('apply.pageSubtitle')}</p>
+      </div>
+
+      {/* Restore draft banner */}
+      {restoreOffered && (
+        <div className="mb-8 border border-amber/40 bg-amber/[0.06] px-4 py-3 flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-start gap-3">
+            <I.info className="w-4 h-4 text-amber shrink-0 mt-0.5"/>
+            <div>
+              <div className="text-sm text-bone">{t('apply.draftBannerTitle')}</div>
+              <div className="micro text-smoke mt-0.5">{t('apply.draftBannerSub')}</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={discard} className="px-3 py-1.5 text-[12px] tracking-wider text-ash hover:text-bone border border-ink-500 hover:border-ash transition-colors">
+              {t('apply.draftDiscard')}
+            </button>
+            <button onClick={restore} className="px-3 py-1.5 text-[12px] tracking-wider text-ink bg-amber hover:bg-amber/90 transition-colors">
+              {t('apply.draftRestore')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="grid lg:grid-cols-[1fr_320px] gap-10 lg:gap-14">
+        {/* Form column */}
+        <div className="min-w-0">
+          <ApplySection1 draft={draft} set={set} errors={errors}/>
+          <ApplySection2 draft={draft} set={set} errors={errors}/>
+          <ApplySection3
+            draft={draft}
+            toggleModel={toggleModel}
+            setModel={setModel}
+            addCustomModel={addCustomModel}
+            updateCustomModel={updateCustomModel}
+            removeCustomModel={removeCustomModel}
+            errors={errors}
+          />
+          <ApplySection4 draft={draft} set={set} errors={errors}/>
+          <ApplySection5 draft={draft} set={set} errors={errors}/>
+          <ApplySection6 draft={draft} set={set} errors={errors}/>
+
+          {/* Bottom submit */}
+          <div className="mt-12 pt-8 border-t border-ink-600">
+            <button
+              onClick={onSubmit}
+              disabled={submitting}
+              className={cx(
+                'w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 text-sm tracking-wide transition-all',
+                submitting ? 'bg-ink-600 text-smoke cursor-wait' : 'btn-brand bg-brand-deep text-bone hover:bg-brand'
+              )}
+            >
+              {submitting ? <I.spin className="w-4 h-4 animate-spin"/> : <I.send className="w-4 h-4"/>}
+              {submitting ? t('apply.submitting') : t('apply.submitBtn')}
+            </button>
+            <p className="mt-3 text-[12px] text-smoke max-w-xl leading-relaxed">{t('apply.submitHint')}</p>
+          </div>
+        </div>
+
+        {/* Right column · sticky TOC */}
+        <ApplyTOC
+          activeSec={activeSec}
+          filled={requiredFilled}
+          total={requiredTotal}
+          onSubmit={onSubmit}
+          submitting={submitting}
+        />
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Section header used by all 6 ---------- */
+function ApplySectionHeader({ secKey }) {
+  const { t } = useLang();
+  return (
+    <div className="mb-6 pb-3 border-b border-ink-600">
+      <h2 className="font-serif text-3xl text-bone tracking-editorial leading-tight">{t(`apply.${secKey}`)}</h2>
+      <p className="mt-1.5 text-sm text-ash">{t(`apply.${secKey}Hint`)}</p>
+    </div>
+  );
+}
+
+/* ---------- §1 Basics ---------- */
+function ApplySection1({ draft, set, errors }) {
+  const { t } = useLang();
+  return (
+    <section id="sec1" className="scroll-mt-24 mb-14">
+      <ApplySectionHeader secKey="sec1"/>
+
+      <FormField label={t('apply.fName')} required htmlFor="field-name" error={errors.name}>
+        <FormInput id="field-name" value={draft.name} onChange={v => set('name', v)} placeholder={t('apply.fNamePh')} error={errors.name}/>
+      </FormField>
+
+      <div className="grid sm:grid-cols-2 gap-x-5">
+        <FormField label={t('apply.fType')} required htmlFor="field-type" error={errors.type}>
+          <FormSelect
+            id="field-type"
+            value={draft.type}
+            onChange={v => set('type', v)}
+            error={errors.type}
+            placeholder="—"
+            options={[
+              { value: 'gateway', label: t('apply.fTypeGateway') },
+              { value: 'router', label: t('apply.fTypeRouter') },
+              { value: 'inference', label: t('apply.fTypeInference') },
+              { value: 'marketplace', label: t('apply.fTypeMarketplace') },
+              { value: 'selfhost', label: t('apply.fTypeSelfhost') },
+            ]}
+          />
+        </FormField>
+
+        <FormField label={t('apply.fRegion')} required htmlFor="field-region" error={errors.region}>
+          <FormSelect
+            id="field-region"
+            value={draft.region}
+            onChange={v => set('region', v)}
+            error={errors.region}
+            placeholder="—"
+            options={[
+              { value: 'global', label: t('apply.fRegionGlobal') },
+              { value: 'us', label: t('apply.fRegionUS') },
+              { value: 'eu', label: t('apply.fRegionEU') },
+              { value: 'asia', label: t('apply.fRegionAsia') },
+              { value: 'selfhost', label: t('apply.fRegionSelfhost') },
+              { value: 'multi', label: t('apply.fRegionMulti') },
+            ]}
+          />
+        </FormField>
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-x-5">
+        <FormField label={t('apply.fWebsite')} required htmlFor="field-website" error={errors.website}>
+          <FormInput id="field-website" type="url" value={draft.website} onChange={v => set('website', v)} placeholder={t('apply.fWebsitePh')} error={errors.website}/>
+        </FormField>
+
+        <FormField label={t('apply.fLogoDomain')} hint={t('apply.fLogoDomainHint')} htmlFor="field-logoDomain" error={errors.logoDomain}>
+          <FormInput id="field-logoDomain" value={draft.logoDomain} onChange={v => set('logoDomain', v)} placeholder={t('apply.fLogoDomainPh')} error={errors.logoDomain}/>
+        </FormField>
+      </div>
+
+      <FormField
+        label={t('apply.fShortDesc')}
+        required
+        hint={t('apply.fShortDescHint')}
+        htmlFor="field-shortDesc"
+        error={errors.shortDesc}
+        charCount={{ value: draft.shortDesc.length, max: 120, over: draft.shortDesc.length > 120 }}
+      >
+        <FormTextarea id="field-shortDesc" value={draft.shortDesc} onChange={v => set('shortDesc', v)} rows={2} error={errors.shortDesc}/>
+      </FormField>
+
+      <FormField
+        label={t('apply.fLongDesc')}
+        hint={t('apply.fLongDescHint')}
+        htmlFor="field-longDesc"
+        error={errors.longDesc}
+        charCount={{ value: draft.longDesc.length, max: 500, over: draft.longDesc.length > 500 }}
+      >
+        <FormTextarea id="field-longDesc" value={draft.longDesc} onChange={v => set('longDesc', v)} rows={5} error={errors.longDesc}/>
+      </FormField>
+    </section>
+  );
+}
+
+/* ---------- §2 API access ---------- */
+function ApplySection2({ draft, set, errors }) {
+  const { t } = useLang();
+  return (
+    <section id="sec2" className="scroll-mt-24 mb-14">
+      <ApplySectionHeader secKey="sec2"/>
+
+      <FormField label={t('apply.fApiBaseUrl')} required htmlFor="field-apiBaseUrl" error={errors.apiBaseUrl}>
+        <FormInput id="field-apiBaseUrl" value={draft.apiBaseUrl} onChange={v => set('apiBaseUrl', v)} placeholder={t('apply.fApiBaseUrlPh')} error={errors.apiBaseUrl}/>
+      </FormField>
+
+      <FormField label={t('apply.fAuthMethod')} required error={errors.authMethod}>
+        <FormRadioGroup
+          name="authMethod"
+          value={draft.authMethod}
+          onChange={v => set('authMethod', v)}
+          error={errors.authMethod}
+          options={[
+            { value: 'bearer', label: t('apply.fAuthBearer') },
+            { value: 'header', label: t('apply.fAuthHeader') },
+            { value: 'oauth', label: t('apply.fAuthOAuth') },
+            { value: 'custom', label: t('apply.fAuthCustom') },
+          ]}
+        />
+      </FormField>
+
+      <FormField label={t('apply.fApiKey')} required hint={t('apply.fApiKeySafety')} htmlFor="field-apiKey" error={errors.apiKey}>
+        <FormPasswordInput id="field-apiKey" value={draft.apiKey} onChange={v => set('apiKey', v)} placeholder={t('apply.fApiKeyPh')} error={errors.apiKey}/>
+      </FormField>
+
+      <div className="grid sm:grid-cols-2 gap-x-5">
+        <FormField label={t('apply.fApiDocs')} htmlFor="field-apiDocsUrl" error={errors.apiDocsUrl}>
+          <FormInput id="field-apiDocsUrl" value={draft.apiDocsUrl} onChange={v => set('apiDocsUrl', v)} placeholder={t('apply.fApiDocsPh')} error={errors.apiDocsUrl}/>
+        </FormField>
+
+        <FormField label={t('apply.fRateLimits')} htmlFor="field-rateLimits">
+          <FormInput id="field-rateLimits" value={draft.rateLimits} onChange={v => set('rateLimits', v)} placeholder={t('apply.fRateLimitsPh')}/>
+        </FormField>
+      </div>
+
+      <FormField label={t('apply.fOpenaiCompat')}>
+        <FormRadioGroup
+          name="openaiCompat"
+          value={draft.openaiCompat}
+          onChange={v => set('openaiCompat', v)}
+          options={[
+            { value: 'yes', label: t('apply.fCompatYes') },
+            { value: 'partial', label: t('apply.fCompatPartial') },
+            { value: 'no', label: t('apply.fCompatNo') },
+          ]}
+        />
+      </FormField>
+    </section>
+  );
+}
+
+/* ---------- §3 Models ---------- */
+function ApplySection3({ draft, toggleModel, setModel, addCustomModel, updateCustomModel, removeCustomModel, errors }) {
+  const { t } = useLang();
+  return (
+    <section id="sec3" className="scroll-mt-24 mb-14">
+      <ApplySectionHeader secKey="sec3"/>
+
+      <p className="text-sm text-ash mb-5 leading-relaxed">{t('apply.fModelsHint')}</p>
+
+      {errors.supportedModels && (
+        <div className="mb-4 text-[12px] text-coral flex items-center gap-1.5">
+          <I.alert className="w-3 h-3"/>
+          <span>{errors.supportedModels}</span>
+        </div>
+      )}
+
+      <div className="space-y-2 mb-8">
+        {MODELS.map(m => {
+          const picked = draft.supportedModels.find(s => s.id === m.id);
+          const active = !!picked;
+          const modelErr = errors[`model_${m.id}`];
+          return (
+            <div
+              key={m.id}
+              className={cx(
+                'border transition-colors',
+                active ? 'border-brand bg-brand/[0.04]' : 'border-ink-500',
+                modelErr && 'border-coral'
+              )}
+            >
+              <label className="flex items-center gap-3 px-4 py-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={active}
+                  onChange={() => toggleModel(m.id)}
+                  className="sr-only"
+                />
+                <span className={cx('w-3.5 h-3.5 border shrink-0 inline-flex items-center justify-center transition-colors', active ? 'border-brand bg-brand text-ink' : 'border-ash')}>
+                  {active && <I.check className="w-3 h-3"/>}
+                </span>
+                <div className="flex-1 min-w-0 flex items-center gap-3 flex-wrap">
+                  <span className="text-bone text-sm font-medium">{m.display}</span>
+                  <span className="micro text-smoke">{m.owner}</span>
+                  <span className="micro text-smoke num">
+                    official ${m.officialIn.toFixed(2)} / ${m.officialOut.toFixed(2)}
+                  </span>
+                </div>
+              </label>
+              {active && (
+                <div className="border-t border-ink-500 px-4 py-3 grid sm:grid-cols-2 gap-3 bg-ink-800/40">
+                  <div>
+                    <label className="micro text-smoke block mb-1">{t('apply.fListedIn')} <span className="num">/ 1M tok</span></label>
+                    <FormInput
+                      value={picked.listedIn}
+                      onChange={v => setModel(m.id, { listedIn: v })}
+                      type="number"
+                      placeholder={m.officialIn.toFixed(2)}
+                      error={modelErr}
+                    />
+                  </div>
+                  <div>
+                    <label className="micro text-smoke block mb-1">{t('apply.fListedOut')} <span className="num">/ 1M tok</span></label>
+                    <FormInput
+                      value={picked.listedOut}
+                      onChange={v => setModel(m.id, { listedOut: v })}
+                      type="number"
+                      placeholder={m.officialOut.toFixed(2)}
+                      error={modelErr}
+                    />
+                  </div>
+                  {modelErr && (
+                    <div className="sm:col-span-2 text-[12px] text-coral flex items-center gap-1.5">
+                      <I.alert className="w-3 h-3"/>{modelErr}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Custom models */}
+      <div className="border-t border-ink-600 pt-6">
+        <div className="micro text-smoke mb-3 tracking-wider">{t('apply.fCustomModelsTitle')}</div>
+        {draft.customModels.map((cm, idx) => (
+          <div key={idx} className="border border-ink-500 mb-2 px-4 py-3 bg-ink-800/40">
+            <div className="grid sm:grid-cols-[1.4fr_1fr_0.8fr_0.8fr_auto] gap-3 items-end">
+              <div>
+                <label className="micro text-smoke block mb-1">{t('apply.fCustomModelName')}</label>
+                <FormInput value={cm.name} onChange={v => updateCustomModel(idx, { name: v })} placeholder="e.g. Yi-Vision-Large"/>
+              </div>
+              <div>
+                <label className="micro text-smoke block mb-1">{t('apply.fCustomModelOwner')}</label>
+                <FormInput value={cm.owner} onChange={v => updateCustomModel(idx, { owner: v })} placeholder="e.g. 01.AI"/>
+              </div>
+              <div>
+                <label className="micro text-smoke block mb-1">{t('apply.fListedIn')}</label>
+                <FormInput value={cm.listedIn} onChange={v => updateCustomModel(idx, { listedIn: v })} type="number" placeholder="0.50"/>
+              </div>
+              <div>
+                <label className="micro text-smoke block mb-1">{t('apply.fListedOut')}</label>
+                <FormInput value={cm.listedOut} onChange={v => updateCustomModel(idx, { listedOut: v })} type="number" placeholder="1.50"/>
+              </div>
+              <button
+                type="button"
+                onClick={() => removeCustomModel(idx)}
+                className="px-2.5 py-2 text-ash hover:text-coral border border-ink-500 hover:border-coral transition-colors"
+                aria-label={t('apply.fCustomModelRemove')}
+              >
+                <I.x className="w-4 h-4"/>
+              </button>
+            </div>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={addCustomModel}
+          className="mt-2 px-4 py-2.5 border border-dashed border-ink-500 hover:border-brand hover:text-brand text-ash text-sm transition-colors w-full sm:w-auto"
+        >
+          {t('apply.fCustomModelAdd')}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+/* ---------- §4 Contact ---------- */
+function ApplySection4({ draft, set, errors }) {
+  const { t } = useLang();
+  return (
+    <section id="sec4" className="scroll-mt-24 mb-14">
+      <ApplySectionHeader secKey="sec4"/>
+
+      <FormField label={t('apply.fCompanyName')} required htmlFor="field-companyName" error={errors.companyName}>
+        <FormInput id="field-companyName" value={draft.companyName} onChange={v => set('companyName', v)} placeholder={t('apply.fCompanyNamePh')} error={errors.companyName}/>
+      </FormField>
+
+      <div className="grid sm:grid-cols-2 gap-x-5">
+        <FormField label={t('apply.fContactName')} required htmlFor="field-contactName" error={errors.contactName}>
+          <FormInput id="field-contactName" value={draft.contactName} onChange={v => set('contactName', v)} placeholder={t('apply.fContactNamePh')} error={errors.contactName}/>
+        </FormField>
+
+        <FormField label={t('apply.fContactEmail')} required htmlFor="field-contactEmail" error={errors.contactEmail}>
+          <FormInput id="field-contactEmail" type="email" value={draft.contactEmail} onChange={v => set('contactEmail', v)} placeholder={t('apply.fContactEmailPh')} error={errors.contactEmail}/>
+        </FormField>
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-x-5">
+        <FormField label={t('apply.fContactRole')} htmlFor="field-contactRole">
+          <FormSelect
+            id="field-contactRole"
+            value={draft.contactRole}
+            onChange={v => set('contactRole', v)}
+            placeholder="—"
+            options={[
+              { value: 'bd', label: t('apply.fRoleBD') },
+              { value: 'eng', label: t('apply.fRoleEng') },
+              { value: 'ceo', label: t('apply.fRoleCEO') },
+              { value: 'founder', label: t('apply.fRoleFounder') },
+              { value: 'marketing', label: t('apply.fRoleMarketing') },
+              { value: 'other', label: t('apply.fRoleOther') },
+            ]}
+          />
+        </FormField>
+
+        <FormField label={t('apply.fTimezone')} htmlFor="field-timezone">
+          <FormInput id="field-timezone" value={draft.timezone} onChange={v => set('timezone', v)} placeholder={t('apply.fTimezonePh')}/>
+        </FormField>
+      </div>
+
+      <FormField label={t('apply.fAddress')} hint={t('apply.fAddressHint')} htmlFor="field-address">
+        <FormInput id="field-address" value={draft.address} onChange={v => set('address', v)} placeholder=""/>
+      </FormField>
+    </section>
+  );
+}
+
+/* ---------- §5 Compliance ---------- */
+function ApplySection5({ draft, set, errors }) {
+  const { t } = useLang();
+  return (
+    <section id="sec5" className="scroll-mt-24 mb-14">
+      <ApplySectionHeader secKey="sec5"/>
+
+      <FormField label={t('apply.fCompliance')}>
+        <FormCheckboxGroup
+          value={draft.compliance}
+          onChange={v => set('compliance', v)}
+          options={[
+            { value: 'soc2', label: t('apply.fComplianceSoc2') },
+            { value: 'hipaa', label: t('apply.fComplianceHipaa') },
+            { value: 'gdpr', label: t('apply.fComplianceGdpr') },
+            { value: 'iso27001', label: t('apply.fComplianceIso') },
+            { value: 'other', label: t('apply.fComplianceOther') },
+          ]}
+        />
+      </FormField>
+
+      <div className="grid sm:grid-cols-2 gap-x-5">
+        <FormField label={t('apply.fPrivacy')} htmlFor="field-privacyUrl" error={errors.privacyUrl}>
+          <FormInput id="field-privacyUrl" value={draft.privacyUrl} onChange={v => set('privacyUrl', v)} placeholder="https://" error={errors.privacyUrl}/>
+        </FormField>
+
+        <FormField label={t('apply.fTerms')} htmlFor="field-termsUrl" error={errors.termsUrl}>
+          <FormInput id="field-termsUrl" value={draft.termsUrl} onChange={v => set('termsUrl', v)} placeholder="https://" error={errors.termsUrl}/>
+        </FormField>
+      </div>
+
+      <FormField label={t('apply.fDataRetention')} htmlFor="field-dataRetention">
+        <FormInput id="field-dataRetention" value={draft.dataRetention} onChange={v => set('dataRetention', v)} placeholder={t('apply.fDataRetentionPh')}/>
+      </FormField>
+    </section>
+  );
+}
+
+/* ---------- §6 Other ---------- */
+function ApplySection6({ draft, set, errors }) {
+  const { t } = useLang();
+  return (
+    <section id="sec6" className="scroll-mt-24 mb-14">
+      <ApplySectionHeader secKey="sec6"/>
+
+      <FormField label={t('apply.fReviewSpeed')}>
+        <FormRadioGroup
+          name="reviewSpeed"
+          value={draft.reviewSpeed}
+          onChange={v => set('reviewSpeed', v)}
+          options={[
+            { value: 'standard', label: t('apply.fReviewStandard') },
+            { value: 'rush', label: t('apply.fReviewRush') },
+          ]}
+        />
+      </FormField>
+
+      <FormField label={t('apply.fNotes')} htmlFor="field-notes">
+        <FormTextarea id="field-notes" value={draft.notes} onChange={v => set('notes', v)} rows={4} placeholder={t('apply.fNotesPh')}/>
+      </FormField>
+
+      <FormField label={t('apply.fSource')} htmlFor="field-source">
+        <FormSelect
+          id="field-source"
+          value={draft.source}
+          onChange={v => set('source', v)}
+          placeholder="—"
+          options={[
+            { value: 'social', label: t('apply.fSourceSocial') },
+            { value: 'search', label: t('apply.fSourceSearch') },
+            { value: 'referral', label: t('apply.fSourceReferral') },
+            { value: 'community', label: t('apply.fSourceCommunity') },
+            { value: 'other', label: t('apply.fSourceOther') },
+          ]}
+        />
+      </FormField>
+    </section>
+  );
+}
+
+/* ---------- Right column · sticky TOC ---------- */
+function ApplyTOC({ activeSec, filled, total, onSubmit, submitting }) {
+  const { t } = useLang();
+  const pct = Math.round((filled / total) * 100);
+  return (
+    <aside className="hidden lg:block">
+      <div className="sticky top-24">
+        {/* Progress card */}
+        <div className="border border-ink-600 bg-ink-800 p-5 mb-4">
+          <div className="micro text-smoke mb-3 tracking-wider">
+            {t('apply.reqProgress').replace('{filled}', filled).replace('{total}', total)}
+          </div>
+          <div className="h-1.5 bg-ink-600 mb-4 overflow-hidden">
+            <div
+              className="h-full bg-brand transition-all duration-300 ease-out"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          <button
+            onClick={onSubmit}
+            disabled={submitting}
+            className={cx(
+              'w-full inline-flex items-center justify-center gap-2 py-3 text-sm tracking-wide transition-all',
+              submitting ? 'bg-ink-600 text-smoke cursor-wait' : 'btn-brand bg-brand-deep text-bone hover:bg-brand'
+            )}
+          >
+            {submitting ? <I.spin className="w-4 h-4 animate-spin"/> : null}
+            {submitting ? t('apply.submitting') : t('apply.submitBtn')}
+          </button>
+        </div>
+
+        {/* Section anchor list */}
+        <nav className="border border-ink-600">
+          {APPLY_SECTIONS.map(s => {
+            const active = activeSec === s.id;
+            return (
+              <a
+                key={s.id}
+                href={`#/apply`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  const el = document.getElementById(s.id);
+                  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+                className={cx(
+                  'block px-4 py-2.5 text-[13px] tracking-tight border-l-2 transition-colors',
+                  active
+                    ? 'border-brand bg-brand/[0.06] text-bone'
+                    : 'border-transparent text-ash hover:text-bone hover:bg-ink-700'
+                )}
+              >
+                {t(`apply.${s.key}`)}
+              </a>
+            );
+          })}
+        </nav>
+      </div>
+    </aside>
+  );
+}
+
+/* ---------- Success inline state ---------- */
+function ApplySuccess({ refId, onAnother }) {
+  const { t } = useLang();
+  const [copied, setCopied] = useState(false);
+  const onCopy = () => {
+    try {
+      navigator.clipboard.writeText(refId);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {}
+  };
+  return (
+    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-20 lg:py-28">
+      {/* Decorative check */}
+      <div className="mb-10 inline-flex items-center justify-center w-16 h-16 border border-brand text-brand">
+        <I.check className="w-8 h-8"/>
+      </div>
+
+      <div className="micro text-brand mb-3 tracking-widest">RR-001 · APPLY · RECEIVED</div>
+      <h1 className="font-serif text-5xl sm:text-6xl text-bone tracking-editorial leading-[0.95] mb-8">
+        {t('apply.successTitle')}
+        <span className="text-brand italic">.</span>
+      </h1>
+
+      {/* Reference number card */}
+      <div className="border border-ink-600 bg-ink-800 p-6 mb-10">
+        <div className="micro text-smoke mb-2 tracking-wider">{t('apply.successRefLabel')}</div>
+        <div className="flex items-center gap-3 flex-wrap">
+          <code className="font-mono text-2xl sm:text-3xl text-bone tracking-tight num select-all">{refId}</code>
+          <button
+            onClick={onCopy}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] tracking-wider text-ash hover:text-bone border border-ink-500 hover:border-bone transition-colors"
+          >
+            {copied ? <I.check className="w-3.5 h-3.5 text-brand"/> : <I.copy className="w-3.5 h-3.5"/>}
+            {copied ? t('apply.successCopied') : t('apply.successCopyRef')}
+          </button>
+        </div>
+      </div>
+
+      {/* Next steps */}
+      <div className="mb-12">
+        <div className="micro text-smoke mb-4 tracking-wider">{t('apply.successNextTitle')}</div>
+        <ol className="space-y-3">
+          {[t('apply.successNext1'), t('apply.successNext2'), t('apply.successNext3'), t('apply.successNext4')].map((line, i) => (
+            <li key={i} className="flex items-start gap-3 text-sm text-bone leading-relaxed">
+              <span className="num text-smoke shrink-0 w-5 text-right">{i + 1}.</span>
+              <span>{line}</span>
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      <div className="flex items-center gap-3 flex-wrap pt-8 border-t border-ink-600">
+        <a href="#/" className="btn-brand bg-brand-deep text-bone hover:bg-brand inline-flex items-center gap-2 px-6 py-3 text-sm tracking-wide transition-all">
+          {t('apply.successDone')}
+        </a>
+        <button
+          onClick={onAnother}
+          className="inline-flex items-center gap-2 px-6 py-3 text-sm tracking-wide text-ash hover:text-bone border border-ink-500 hover:border-bone transition-colors"
+        >
+          {t('apply.successAnother')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ===========================================================
    APP ROOT
    =========================================================== */
 
@@ -6908,6 +8285,7 @@ function App() {
   else if (path === '/run' || path === '/compare' || path === '/playground') page = <RunPage/>;
   else if (path === '/validate') page = <ValidatePage/>;
   else if (path === '/docs') page = <DocsPage/>;
+  else if (path === '/apply') page = <ApplyPage/>;
   else if (path.startsWith('/providers/')) {
     const slug = path.replace('/providers/', '');
     page = <ProviderPage slug={slug}/>;
