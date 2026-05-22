@@ -2,7 +2,7 @@
 
 > A transparency study of AI routers — cost truth, latency, model fidelity, and on-chain payment rails.
 
-GatewayBench is the framework behind RouterRank, a public ledger of AI router behavior for developers who refuse to take vendor claims at face value. Three tiers, nine dimensions, all anchored to published research.
+GatewayBench is the framework behind Check4U, a public ledger of AI router behavior for developers who refuse to take vendor claims at face value. Three tiers, nine dimensions, all anchored to published research.
 
 ## Stack
 

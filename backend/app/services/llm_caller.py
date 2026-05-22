@@ -200,8 +200,8 @@ async def call_google_gemini(model_id: str, prompt: str, temperature: float, sys
 _OPENROUTER_HEADERS = {
     "Authorization": f"Bearer {settings.openrouter_api_key}",
     "Content-Type": "application/json",
-    "HTTP-Referer": "https://routerrank.ai",
-    "X-OpenRouter-Title": "RouterRank",
+    "HTTP-Referer": "https://check4u.ai",
+    "X-OpenRouter-Title": "Check4U",
 }
 
 

@@ -1,4 +1,4 @@
-# RouterRank Backend
+# Check4U Backend
 
 FastAPI + Supabase backend，提供三项核心服务：
 1. **定价数据 API** — 官方 & 聚合商 token 价格查询

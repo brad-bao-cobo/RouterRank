@@ -22,7 +22,7 @@ function Logo({ className = "" }: { className?: string }) {
         <span className="absolute -top-1 -right-1 w-1.5 h-1.5 bg-brand rounded-full pulse-dot" />
       </div>
       <div className="leading-none">
-        <div className="serif text-[22px] tracking-editorial">RouterRank</div>
+        <div className="serif text-[22px] tracking-editorial">Check4U</div>
         <div className="micro text-smoke mt-0.5">{t("header.tagline")}</div>
       </div>
     </Link>

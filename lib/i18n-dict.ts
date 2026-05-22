@@ -89,8 +89,8 @@ export const I18N: Record<Lang, any> = {
       mSampling: "Sampling protocol",
       mIntegrity: "Provider integrity",
       disclaimer:
-        "This is a product preview built on mock data. Trust scores, fingerprint readings, latency and cost figures are illustrative — not investment, integration or procurement advice. x402 is an open payment standard stewarded by the Linux Foundation; RouterRank is not affiliated with the x402 Foundation. Provider names and logos are property of their respective owners and shown for identification only.",
-      copyright: "© RouterRank 2026 · Mock data — wired for product preview",
+        "This is a product preview built on mock data. Trust scores, fingerprint readings, latency and cost figures are illustrative — not investment, integration or procurement advice. x402 is an open payment standard stewarded by the Linux Foundation; Check4U is not affiliated with the x402 Foundation. Provider names and logos are property of their respective owners and shown for identification only.",
+      copyright: "© Check4U 2026 · Mock data — wired for product preview",
     },
     ticker: { live: "Live payments · x402" },
     ranking: {
@@ -399,7 +399,7 @@ export const I18N: Record<Lang, any> = {
       hide: "Hide",
       show: "Show",
       keyNote:
-        "Your key is sent only to the URL above. RouterRank never stores, logs or transmits it elsewhere — the probe runs in your browser.",
+        "Your key is sent only to the URL above. Check4U never stores, logs or transmits it elsewhere — the probe runs in your browser.",
       errorPasteOrPick: "Paste a URL or pick one of the samples below.",
       errorInvalidUrl: "That does not look like a valid URL.",
       tryLabel: "Try:",
@@ -509,7 +509,7 @@ export const I18N: Record<Lang, any> = {
       walletConnectSub: "Any v2-compatible wallet",
       walletExtName: "Browser extension",
       walletExtSub: "MetaMask, Rabby, Frame",
-      connectDisclaimerPre: "By connecting, you agree to RouterRank's ",
+      connectDisclaimerPre: "By connecting, you agree to Check4U's ",
       connectDisclaimerPrivacy: "privacy",
       connectDisclaimerAnd: " and ",
       connectDisclaimerTerms: "terms",
@@ -533,7 +533,7 @@ export const I18N: Record<Lang, any> = {
       copyPrompt: "Copy prompt",
       copyToast: "Prompt copied · paste into your agent",
       footnote:
-        "Your existing wallet is not touched. Funds move to a fresh agent wallet that only this provider draws from. x402 settles per-request — no monthly bills, no API key on RouterRank's side.",
+        "Your existing wallet is not touched. Funds move to a fresh agent wallet that only this provider draws from. x402 settles per-request — no monthly bills, no API key on Check4U's side.",
     },
     payment: {
       intentTag: "Payment intent",
@@ -546,7 +546,7 @@ export const I18N: Record<Lang, any> = {
       rowMethodValue: "Agentic Wallet · x402 · USDC on Base",
       rowFrom: "From",
       signAndPay: "Sign & pay",
-      footnote: "Settles in ~3s via x402 · 0% RouterRank fee in MVP",
+      footnote: "Settles in ~3s via x402 · 0% Check4U fee in MVP",
       awaiting: "Awaiting signature",
       awaitingSub: "Please confirm in your wallet",
       paid: "Paid.",
@@ -995,8 +995,8 @@ export const I18N: Record<Lang, any> = {
       mSampling: "采样协议",
       mIntegrity: "路由器诚信度",
       disclaimer:
-        "本站是一个基于 mock 数据的产品预览。信任分数、指纹检测、延迟与成本数字仅供说明,不构成投资、集成或采购建议。x402 是由 Linux Foundation 托管的开放支付标准,RouterRank 与 x402 Foundation 没有从属关系。各路由器名称与 logo 归各自所有方,仅用于识别目的。",
-      copyright: "© RouterRank 2026 · Mock 数据 · 产品预览专用",
+        "本站是一个基于 mock 数据的产品预览。信任分数、指纹检测、延迟与成本数字仅供说明,不构成投资、集成或采购建议。x402 是由 Linux Foundation 托管的开放支付标准,Check4U 与 x402 Foundation 没有从属关系。各路由器名称与 logo 归各自所有方,仅用于识别目的。",
+      copyright: "© Check4U 2026 · Mock 数据 · 产品预览专用",
     },
     ticker: { live: "实时支付 · x402" },
     ranking: {
@@ -1285,7 +1285,7 @@ export const I18N: Record<Lang, any> = {
       hide: "隐藏",
       show: "显示",
       keyNote:
-        "你的 key 仅会被发往上方 URL。RouterRank 不会存储、记录或转发它——探测在你的浏览器内完成。",
+        "你的 key 仅会被发往上方 URL。Check4U 不会存储、记录或转发它——探测在你的浏览器内完成。",
       errorPasteOrPick: "请粘贴 URL 或从下方样例中挑选一个。",
       errorInvalidUrl: "这看起来不是一个有效的 URL。",
       tryLabel: "试试:",
@@ -1391,7 +1391,7 @@ export const I18N: Record<Lang, any> = {
       walletConnectSub: "任意 v2 兼容钱包",
       walletExtName: "浏览器插件",
       walletExtSub: "MetaMask、Rabby、Frame",
-      connectDisclaimerPre: "连接即表示你同意 RouterRank 的 ",
+      connectDisclaimerPre: "连接即表示你同意 Check4U 的 ",
       connectDisclaimerPrivacy: "隐私政策",
       connectDisclaimerAnd: " 与 ",
       connectDisclaimerTerms: "服务条款",
@@ -1415,7 +1415,7 @@ export const I18N: Record<Lang, any> = {
       copyPrompt: "复制 prompt",
       copyToast: "已复制 · 粘贴到你的 agent",
       footnote:
-        "你已有的钱包不会被动到。资金会被转入一个全新的 agent 钱包,只有这家路由器会从中扣款。x402 按请求结算——没有月费、RouterRank 这边也不会持有 API key。",
+        "你已有的钱包不会被动到。资金会被转入一个全新的 agent 钱包,只有这家路由器会从中扣款。x402 按请求结算——没有月费、Check4U 这边也不会持有 API key。",
     },
     payment: {
       intentTag: "支付意图",
@@ -1428,7 +1428,7 @@ export const I18N: Record<Lang, any> = {
       rowMethodValue: "Agentic Wallet · x402 · Base 链 USDC",
       rowFrom: "来源地址",
       signAndPay: "签名并支付",
-      footnote: "通过 x402 约 3 秒完成结算 · MVP 阶段 RouterRank 不收手续费",
+      footnote: "通过 x402 约 3 秒完成结算 · MVP 阶段 Check4U 不收手续费",
       awaiting: "等待签名",
       awaitingSub: "请在你的钱包中确认",
       paid: "已支付。",

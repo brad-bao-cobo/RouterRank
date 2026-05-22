@@ -1,4 +1,4 @@
-// Core domain types for GatewayBench / RouterRank
+// Core domain types for GatewayBench / Check4U
 
 export type ProviderType = "router" | "gateway" | "inference" | "self_host";
 

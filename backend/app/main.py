@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routers import pricing, stream_test, test_run, model_evaluation, providers
 
 app = FastAPI(
-    title="RouterRank API",
+    title="Check4U API",
     description="Pricing transparency & token billing audit for AI router providers",
     version="0.2.0",
 )

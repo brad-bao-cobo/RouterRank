@@ -4,7 +4,7 @@ import { Providers } from "./providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "GatewayBench — RouterRank",
+  title: "GatewayBench — Check4U",
   description:
     "An open ledger of AI router behavior — cost truth, latency, model fidelity, and on-chain payment rails.",
 };

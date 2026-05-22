@@ -2,7 +2,7 @@ services:
 
   db:
     image: postgres:15
-    container_name: routerrank-db
+    container_name: check4u-db
     environment:
       POSTGRES_DB:       routerrank_test
       POSTGRES_USER:     postgres
@@ -20,7 +20,7 @@ services:
 
   postgrest:
     image: postgrest/postgrest:v12.0.2
-    container_name: routerrank-postgrest
+    container_name: check4u-postgrest
     environment:
       PGRST_DB_URI:       postgres://postgres:postgres@db:5432/routerrank_test
       PGRST_DB_SCHEMA:    public
@@ -34,7 +34,7 @@ services:
   # API 网关：把 /rest/v1/* 路由到 PostgREST（模拟 Supabase 云端的 Kong）
   gateway:
     image: nginx:alpine
-    container_name: routerrank-gateway
+    container_name: check4u-gateway
     volumes:
       - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
     ports:
